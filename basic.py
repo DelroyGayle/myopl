@@ -2469,12 +2469,12 @@ class Interpreter:
 
         i = start_value.value
 
-        if step_value.value >= 0:
-            condition = lambda: i < end_value.value
-        else:
-            condition = lambda: i > end_value.value
-
-        while condition():
+        while True:
+            condition = (i < end_value.value if step_value.value >= 0
+                         else i > end_value.value
+                         )
+            if not condition:
+                break
             context.symbol_table.set(node.var_name_tok.value, Number(i))
             i += step_value.value
 
