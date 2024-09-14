@@ -220,7 +220,12 @@ class Lexer:
             elif self.current_char in LETTERS:
                 tokens.append(self.make_identifier())
             elif self.current_char == '"':
-                tokens.append(self.make_string())
+                result, error = self.make_string()
+                if error:
+                    return [], error
+                
+                tokens.append(result)
+
             elif self.current_char == "+":
                 tokens.append(Token(TT_PLUS, pos_start=self.pos))
                 self.advance()
@@ -314,8 +319,15 @@ class Lexer:
             self.advance()
             escape_character = False
 
+        if self.current_char is None:
+            # Unterminated string
+            pos_start = self.pos.copy()
+
+            return (None, InvalidSyntaxError(pos_start, self.pos,
+                        "Unterminated String"))
+
         self.advance()
-        return Token(TT_STRING, string, pos_start, self.pos)
+        return Token(TT_STRING, string, pos_start, self.pos), None
 
     def make_identifier(self):
         id_str = ""
@@ -411,7 +423,7 @@ class Lexer:
                 break
 
             elif self.current_char is None:
-                # Unterminated multiline Comment
+                # Unterminated Multiline Comment
                 pos_start = self.pos.copy()
                 # Generally the comment in question
                 # would be on the previous line
@@ -419,7 +431,7 @@ class Lexer:
                     pos_start.ln -= 1
 
                 return (None, InvalidSyntaxError(pos_start, self.pos,
-                        "Unterminated multiline Comment"))
+                        "Unterminated Multiline Comment"))
 
             self.advance()
 
