@@ -1,5 +1,5 @@
 import basic
-print("8"*-3)
+
 while True:
     text = input('basic > ')
     if text.strip() == "":
