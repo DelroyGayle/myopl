@@ -208,7 +208,10 @@ class Lexer:
             if self.current_char in " \t":
                 self.advance()
             elif self.current_char == "#":
-                self.skip_comment()
+                _, error = self.skip_comment()
+                if error:
+                    return [], error
+
             elif self.current_char in ";\n":
                 tokens.append(Token(TT_NEWLINE, pos_start=self.pos))
                 self.advance()
@@ -384,12 +387,45 @@ class Lexer:
         return Token(tok_type, pos_start=pos_start, pos_end=self.pos)
 
     def skip_comment(self):
-        self.advance()
+        """
+        Include multiline Comments
+        That is
+        #* .... *#
+        """
 
-        while self.current_char != "\n":
+        multi_line_comment = False
+        self.advance()
+        if self.current_char == "*":
+            multi_line_comment = True
+
+        while True:
+            if self.current_char == "*" and multi_line_comment:
+                self.advance()
+                if self.current_char != "#":
+                    continue
+                else:
+                    break
+
+            elif (not multi_line_comment and
+                  (self.current_char == "\n" or self.current_char is None)):
+                break
+
+            elif self.current_char is None:
+                # Unterminated multiline Comment
+                pos_start = self.pos.copy()
+                # Generally the comment in question
+                # would be on the previous line
+                if pos_start.ln:
+                    pos_start.ln -= 1
+
+                return (None, InvalidSyntaxError(pos_start, self.pos,
+                        "Unterminated multiline Comment"))
+
             self.advance()
 
         self.advance()
+        # Success
+        return None, None
 
 
 #######################################
