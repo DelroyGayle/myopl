@@ -1,3 +1,10 @@
+"""
+misc.py
+In order to refactor basic.py
+This module will contain miscellaneous code needed by basic.py
+"""
+
+
 def string_with_arrows(text, pos_start, pos_end):
     result = ''
 
