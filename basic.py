@@ -7,6 +7,7 @@ from strings_with_arrows import *
 import string
 import os
 import math
+from dataclasses import dataclass
 
 #######################################
 # CONSTANTS
@@ -157,6 +158,7 @@ KEYWORDS = [
     "RETURN",
     "CONTINUE",
     "BREAK",
+    "IMPORT",
 ]
 
 
@@ -223,7 +225,7 @@ class Lexer:
                 result, error = self.make_string()
                 if error:
                     return [], error
-                
+
                 tokens.append(result)
 
             elif self.current_char == "+":
@@ -324,7 +326,7 @@ class Lexer:
             pos_start = self.pos.copy()
 
             return (None, InvalidSyntaxError(pos_start, self.pos,
-                        "Unterminated String"))
+                    "Unterminated String"))
 
         self.advance()
         return Token(TT_STRING, string, pos_start, self.pos), None
@@ -611,6 +613,15 @@ class BreakNode:
         self.pos_end = pos_end
 
 
+@dataclass
+class ImportNode:
+    string_node: StringNode
+    pos_start: Position
+    pos_end: Position
+
+    def __repr__(self) -> str:
+        return f"IMPORT {self.string_node!r}"
+
 #######################################
 # PARSE RESULT
 #######################################
@@ -756,6 +767,20 @@ class Parser:
             return res.success(
                 BreakNode(pos_start, self.current_tok.pos_start.copy())
             )
+
+        if self.current_tok.matches(TT_KEYWORD, 'IMPORT'):
+            res.register_advancement()
+            self.advance()
+
+            if not self.current_tok.type == TT_STRING:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start, self.current_tok.pos_end,
+                    "Expected string"
+                ))
+
+            string = res.register(self.atom())
+            return res.success(ImportNode(string, pos_start,
+                                          self.current_tok.pos_start.copy()))
 
         expr = res.register(self.expr())
         if res.error:
@@ -2247,6 +2272,8 @@ class BuiltInFunction(BaseFunction):
                 )
             )
 
+        print("WARNING: run() is deprecated. Use 'IMPORT' instead")
+
         fn = fn.value
 
         try:
@@ -2647,10 +2674,33 @@ class Interpreter:
     def visit_BreakNode(self, node, context):
         return RTResult().success_break()
 
+    """ Allows imports of scripts whilst executing the main script """
+    def visit_ImportNode(self, node, context):
+        res = RTResult()
+        filepath = res.register(self.visit(node.string_node, context))
+
+        try:
+            with open(filepath.value, "r") as f:
+                filename = filepath.value.split("/")[-1]
+                code = f.read()
+        except FileNotFoundError:
+            return res.failure(RTError(
+                node.string_node.pos_start.copy(),
+                node.string_node.pos_end.copy(),
+                f"Can't find file '{filepath.value}'", context
+            ))
+
+        res.register(run(filename, code, context, node.pos_start.copy(),
+                         return_result=True))
+        if res.error:
+            return res
+
+        return res.success(Number.null)
 
 #######################################
 # RUN
 #######################################
+
 
 global_symbol_table = SymbolTable()
 global_symbol_table.set("NULL", Number.null)
@@ -2674,7 +2724,8 @@ global_symbol_table.set("LEN", BuiltInFunction.len)
 global_symbol_table.set("RUN", BuiltInFunction.run)
 
 
-def run(fn, text):
+def run(fn, text, context=None, entry_pos=None, return_result=False):
+    """ 'RUN' Expanded to allow each script to have its own 'context' """
     # Generate tokens
     lexer = Lexer(fn, text)
     tokens, error = lexer.make_tokens()
@@ -2689,8 +2740,14 @@ def run(fn, text):
 
     # Run program
     interpreter = Interpreter()
-    context = Context("<program>")
-    context.symbol_table = global_symbol_table
+    context = Context('<program>', context, entry_pos)
+    if context.parent is None:
+        context.symbol_table = global_symbol_table
+    else:
+        context.symbol_table = context.parent.symbol_table
+
     result = interpreter.visit(ast.node, context)
+    if return_result:
+        return result
 
     return result.value, result.error
