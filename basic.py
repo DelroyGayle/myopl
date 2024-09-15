@@ -1963,6 +1963,12 @@ class BaseFunction(Value):
         super().__init__()
         self.name = name or "<anonymous>"
 
+    def set_context(self, context=None):
+        """ This code allows for 'true function closures' """
+        if hasattr(self, "context") and self.context:
+            return self
+        return super().set_context(context)
+
     def generate_new_context(self):
         new_context = Context(self.name, self.context, self.pos_start)
         new_context.symbol_table = SymbolTable(new_context.parent.symbol_table)
@@ -2690,8 +2696,20 @@ class Interpreter:
                 f"Can't find file '{filepath.value}'", context
             ))
 
-        res.register(run(filename, code, context, node.pos_start.copy(),
-                         return_result=True))
+        result, error = run(filename, code, context, node.pos_start.copy(),
+                            return_result=True)
+        if error:
+            return RTResult().failure(
+                RTError(
+                    node.string_node.pos_start.copy(),
+                    node.string_node.pos_end.copy(),
+                    f'Failed to IMPORT script "{filename}"\n'
+                    + error.as_string(),
+                    context,
+                )
+            )
+
+        res.register(result)
         if res.error:
             return res
 
@@ -2748,6 +2766,6 @@ def run(fn, text, context=None, entry_pos=None, return_result=False):
 
     result = interpreter.visit(ast.node, context)
     if return_result:
-        return result
+        return result, None
 
     return result.value, result.error
