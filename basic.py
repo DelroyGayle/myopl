@@ -2,18 +2,10 @@
 # IMPORTS
 #######################################
 
-import string
 import os
 import math
 import misc
-
-#######################################
-# CONSTANTS
-#######################################
-
-DIGITS = "0123456789"
-LETTERS = string.ascii_letters
-LETTERS_DIGITS = LETTERS + DIGITS
+import constants as c
 
 #######################################
 # ERRORS
@@ -28,10 +20,11 @@ class Error:
         self.details = details
 
     def as_string(self):
-        result = f"{self.error_name}: {self.details}\n"
-        result += f"File {self.pos_start.fn}, line {self.pos_start.ln + 1}"
+        result = f"{self.error_name}: {self.details}\n\n"
+        result += (f"File {self.pos_start.filename}, "
+                   f"line {self.pos_start.linenum + 1}")
         result += "\n\n" + misc.string_with_arrows(
-            self.pos_start.ftxt, self.pos_start, self.pos_end
+            self.pos_start.filetext, self.pos_start, self.pos_end
         )
         return result
 
@@ -60,23 +53,23 @@ class RTError(Error):
         result = self.generate_traceback()
         result += f"{self.error_name}: {self.details}"
         result += "\n\n" + misc.string_with_arrows(
-            self.pos_start.ftxt, self.pos_start, self.pos_end
+            self.pos_start.filetext, self.pos_start, self.pos_end
         )
         return result
 
     def generate_traceback(self):
         result = ""
         pos = self.pos_start
-        ctx = self.context
+        context = self.context
 
-        while ctx:
+        while context:
             result = (
-                (f"  File {pos.fn}, line {str(pos.ln + 1)}, "
-                 f"in {ctx.display_name}\n")
+                (f"  File {pos.filename}, line {str(pos.linenum + 1)}, "
+                 f"in {context.display_name}\n")
                 + result
             )
-            pos = ctx.parent_entry_pos
-            ctx = ctx.parent
+            pos = context.parent_entry_pos
+            context = context.parent
 
         return "Traceback (most recent call last):\n" + result
 
@@ -87,25 +80,26 @@ class RTError(Error):
 
 
 class Position:
-    def __init__(self, idx, ln, col, fn, ftxt):
-        self.idx = idx
-        self.ln = ln
-        self.col = col
-        self.fn = fn
-        self.ftxt = ftxt
+    def __init__(self, theindex, linenum, column, filename, filetext):
+        self.theindex = theindex
+        self.linenum = linenum
+        self.column = column
+        self.filename = filename
+        self.filetext = filetext
 
     def advance(self, current_char=None):
-        self.idx += 1
-        self.col += 1
+        self.theindex += 1
+        self.column += 1
 
         if current_char == "\n":
-            self.ln += 1
-            self.col = 0
+            self.linenum += 1
+            self.column = 0
 
         return self
 
     def copy(self):
-        return Position(self.idx, self.ln, self.col, self.fn, self.ftxt)
+        return Position(self.theindex, self.linenum, self.column,
+                        self.filename, self.filetext)
 
 
 #######################################
@@ -188,17 +182,18 @@ class Token:
 
 
 class Lexer:
-    def __init__(self, fn, text):
-        self.fn = fn
+    def __init__(self, filename, text):
+        self.filename = filename
         self.text = text
-        self.pos = Position(-1, 0, -1, fn, text)
+        self.pos = Position(-1, 0, -1, filename, text)
         self.current_char = None
         self.advance()
 
     def advance(self):
         self.pos.advance(self.current_char)
         self.current_char = (
-            self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
+            self.text[self.pos.theindex]
+            if self.pos.theindex < len(self.text) else None
         )
 
     def make_tokens(self):
@@ -215,9 +210,9 @@ class Lexer:
             elif self.current_char in ";\n":
                 tokens.append(Token(TT_NEWLINE, pos_start=self.pos))
                 self.advance()
-            elif self.current_char in DIGITS:
+            elif self.current_char in c.DIGITS:
                 tokens.append(self.make_number())
-            elif self.current_char in LETTERS:
+            elif self.current_char in c.LETTERS:
                 tokens.append(self.make_identifier())
             elif self.current_char == '"':
                 result, error = self.make_string()
@@ -283,7 +278,7 @@ class Lexer:
         pos_start = self.pos.copy()
 
         while (self.current_char is not None and
-               self.current_char in DIGITS + "."):
+               self.current_char in c.DIGITS + "."):
             if self.current_char == ".":
                 if dot_count == 1:
                     break
@@ -335,7 +330,7 @@ class Lexer:
 
         while (
             self.current_char is not None
-            and self.current_char in LETTERS_DIGITS + "_"
+            and self.current_char in c.LETTERS_DIGITS + "_"
         ):
             id_str += self.current_char
             self.advance()
@@ -427,8 +422,8 @@ class Lexer:
                 pos_start = self.pos.copy()
                 # Generally the comment in question
                 # would be on the previous line
-                if pos_start.ln:
-                    pos_start.ln -= 1
+                if pos_start.linenum:
+                    pos_start.linenum -= 1
 
                 return (None, InvalidSyntaxError(pos_start, self.pos,
                         "Unterminated Multiline Comment"))
@@ -2001,19 +1996,19 @@ class BaseFunction(Value):
 
         return res.success(None)
 
-    def populate_args(self, arg_names, args, exec_ctx):
+    def populate_args(self, arg_names, args, execution_context):
         for i in range(len(args)):
             arg_name = arg_names[i]
             arg_value = args[i]
-            arg_value.set_context(exec_ctx)
-            exec_ctx.symbol_table.set(arg_name, arg_value)
+            arg_value.set_context(execution_context)
+            execution_context.symbol_table.set(arg_name, arg_value)
 
-    def check_and_populate_args(self, arg_names, args, exec_ctx):
+    def check_and_populate_args(self, arg_names, args, execution_context):
         res = RTResult()
         res.register(self.check_args(arg_names, args))
         if res.should_return():
             return res
-        self.populate_args(arg_names, args, exec_ctx)
+        self.populate_args(arg_names, args, execution_context)
         return res.success(None)
 
 
@@ -2027,15 +2022,17 @@ class Function(BaseFunction):
     def execute(self, args):
         res = RTResult()
         interpreter = Interpreter()
-        exec_ctx = self.generate_new_context()
+        execution_context = self.generate_new_context()
 
         res.register(
-            self.check_and_populate_args(self.arg_names, args, exec_ctx)
+            self.check_and_populate_args(self.arg_names, args,
+                                         execution_context)
         )
         if res.should_return():
             return res
 
-        value = res.register(interpreter.visit(self.body_node, exec_ctx))
+        value = res.register(interpreter.visit(self.body_node,
+                                               execution_context))
         if res.should_return() and res.func_return_value is None:
             return res
 
@@ -2064,18 +2061,19 @@ class BuiltInFunction(BaseFunction):
 
     def execute(self, args):
         res = RTResult()
-        exec_ctx = self.generate_new_context()
+        execution_context = self.generate_new_context()
 
         method_name = f"execute_{self.name}"
         method = getattr(self, method_name, self.no_visit_method)
 
         res.register(
-            self.check_and_populate_args(method.arg_names, args, exec_ctx)
+            self.check_and_populate_args(method.arg_names, args,
+                                         execution_context)
         )
         if res.should_return():
             return res
 
-        return_value = res.register(method(exec_ctx))
+        return_value = res.register(method(execution_context))
         if res.should_return():
             return res
         return res.success(return_value)
@@ -2094,26 +2092,26 @@ class BuiltInFunction(BaseFunction):
 
     #####################################
 
-    def execute_print(self, exec_ctx):
-        print(str(exec_ctx.symbol_table.get("value")))
+    def execute_print(self, execution_context):
+        print(str(execution_context.symbol_table.get("value")))
         return RTResult().success(Number.null)
 
     execute_print.arg_names = ["value"]
 
-    def execute_print_ret(self, exec_ctx):
+    def execute_print_ret(self, execution_context):
         return RTResult().success(
-            String(str(exec_ctx.symbol_table.get("value")))
+            String(str(execution_context.symbol_table.get("value")))
         )
 
     execute_print_ret.arg_names = ["value"]
 
-    def execute_input(self, exec_ctx):
+    def execute_input(self, execution_context):
         text = input()
         return RTResult().success(String(text))
 
     execute_input.arg_names = []
 
-    def execute_input_int(self, exec_ctx):
+    def execute_input_int(self, execution_context):
         while True:
             text = input()
             try:
@@ -2125,41 +2123,44 @@ class BuiltInFunction(BaseFunction):
 
     execute_input_int.arg_names = []
 
-    def execute_clear(self, exec_ctx):
+    def execute_clear(self, execution_context):
         os.system("cls" if os.name == "nt" else "cls")
         return RTResult().success(Number.null)
 
     execute_clear.arg_names = []
 
-    def execute_is_number(self, exec_ctx):
-        is_number = isinstance(exec_ctx.symbol_table.get("value"), Number)
+    def execute_is_number(self, execution_context):
+        is_number = isinstance(
+            execution_context.symbol_table.get("value"), Number)
         return RTResult().success(Number.true if is_number else Number.false)
 
     execute_is_number.arg_names = ["value"]
 
-    def execute_is_string(self, exec_ctx):
-        is_number = isinstance(exec_ctx.symbol_table.get("value"), String)
+    def execute_is_string(self, execution_context):
+        is_number = isinstance(execution_context.symbol_table.get("value"),
+                               String)
         return RTResult().success(Number.true if is_number else Number.false)
 
     execute_is_string.arg_names = ["value"]
 
-    def execute_is_list(self, exec_ctx):
-        is_number = isinstance(exec_ctx.symbol_table.get("value"), List)
+    def execute_is_list(self, execution_context):
+        is_number = isinstance(execution_context.symbol_table.get("value"),
+                               List)
         return RTResult().success(Number.true if is_number else Number.false)
 
     execute_is_list.arg_names = ["value"]
 
-    def execute_is_function(self, exec_ctx):
+    def execute_is_function(self, execution_context):
         is_number = isinstance(
-            exec_ctx.symbol_table.get("value"), BaseFunction
+            execution_context.symbol_table.get("value"), BaseFunction
         )
         return RTResult().success(Number.true if is_number else Number.false)
 
     execute_is_function.arg_names = ["value"]
 
-    def execute_append(self, exec_ctx):
-        list_ = exec_ctx.symbol_table.get("list")
-        value = exec_ctx.symbol_table.get("value")
+    def execute_append(self, execution_context):
+        list_ = execution_context.symbol_table.get("list")
+        value = execution_context.symbol_table.get("value")
 
         if not isinstance(list_, List):
             return RTResult().failure(
@@ -2167,7 +2168,7 @@ class BuiltInFunction(BaseFunction):
                     self.pos_start,
                     self.pos_end,
                     "First argument must be list",
-                    exec_ctx,
+                    execution_context,
                 )
             )
 
@@ -2176,9 +2177,9 @@ class BuiltInFunction(BaseFunction):
 
     execute_append.arg_names = ["list", "value"]
 
-    def execute_pop(self, exec_ctx):
-        list_ = exec_ctx.symbol_table.get("list")
-        index = exec_ctx.symbol_table.get("index")
+    def execute_pop(self, execution_context):
+        list_ = execution_context.symbol_table.get("list")
+        index = execution_context.symbol_table.get("index")
 
         if not isinstance(list_, List):
             return RTResult().failure(
@@ -2186,7 +2187,7 @@ class BuiltInFunction(BaseFunction):
                     self.pos_start,
                     self.pos_end,
                     "First argument must be list",
-                    exec_ctx,
+                    execution_context,
                 )
             )
 
@@ -2196,7 +2197,7 @@ class BuiltInFunction(BaseFunction):
                     self.pos_start,
                     self.pos_end,
                     "Second argument must be number",
-                    exec_ctx,
+                    execution_context,
                 )
             )
 
@@ -2210,16 +2211,16 @@ class BuiltInFunction(BaseFunction):
                     self.pos_start,
                     self.pos_end,
                     errormess,
-                    exec_ctx,
+                    execution_context,
                 )
             )
         return RTResult().success(element)
 
     execute_pop.arg_names = ["list", "index"]
 
-    def execute_extend(self, exec_ctx):
-        listA = exec_ctx.symbol_table.get("listA")
-        listB = exec_ctx.symbol_table.get("listB")
+    def execute_extend(self, execution_context):
+        listA = execution_context.symbol_table.get("listA")
+        listB = execution_context.symbol_table.get("listB")
 
         if not isinstance(listA, List):
             return RTResult().failure(
@@ -2227,7 +2228,7 @@ class BuiltInFunction(BaseFunction):
                     self.pos_start,
                     self.pos_end,
                     "First argument must be list",
-                    exec_ctx,
+                    execution_context,
                 )
             )
 
@@ -2237,7 +2238,7 @@ class BuiltInFunction(BaseFunction):
                     self.pos_start,
                     self.pos_end,
                     "Second argument must be list",
-                    exec_ctx,
+                    execution_context,
                 )
             )
 
@@ -2246,8 +2247,8 @@ class BuiltInFunction(BaseFunction):
 
     execute_extend.arg_names = ["listA", "listB"]
 
-    def execute_len(self, exec_ctx):
-        list_ = exec_ctx.symbol_table.get("list")
+    def execute_len(self, execution_context):
+        list_ = execution_context.symbol_table.get("list")
 
         if not isinstance(list_, List):
             return RTResult().failure(
@@ -2255,7 +2256,7 @@ class BuiltInFunction(BaseFunction):
                     self.pos_start,
                     self.pos_end,
                     "Argument must be list",
-                    exec_ctx,
+                    execution_context,
                 )
             )
 
@@ -2263,52 +2264,52 @@ class BuiltInFunction(BaseFunction):
 
     execute_len.arg_names = ["list"]
 
-    def execute_run(self, exec_ctx):
-        fn = exec_ctx.symbol_table.get("fn")
+    def execute_run(self, execution_context):
+        filename = execution_context.symbol_table.get("filename")
 
-        if not isinstance(fn, String):
+        if not isinstance(filename, String):
             return RTResult().failure(
                 RTError(
                     self.pos_start,
                     self.pos_end,
                     "Second argument must be string",
-                    exec_ctx,
+                    execution_context,
                 )
             )
 
         print("WARNING: run() is deprecated. Use 'IMPORT' instead")
 
-        fn = fn.value
+        filename = filename.value
 
         try:
-            with open(fn, "r") as f:
+            with open(filename, "r") as f:
                 script = f.read()
         except Exception as e:
             return RTResult().failure(
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    f'Failed to load script "{fn}"\n' + str(e),
-                    exec_ctx,
+                    f'Failed to load script "{filename}"\n' + str(e),
+                    execution_context,
                 )
             )
 
-        _, error = run(fn, script)
+        _, error = run(filename, script)
 
         if error:
             return RTResult().failure(
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    f'Failed to finish executing script "{fn}"\n'
+                    f'Failed to finish executing script "{filename}"\n'
                     + error.as_string(),
-                    exec_ctx,
+                    execution_context,
                 )
             )
 
         return RTResult().success(Number.null)
 
-    execute_run.arg_names = ["fn"]
+    execute_run.arg_names = ["filename"]
 
 
 BuiltInFunction.print = BuiltInFunction("print")
@@ -2740,10 +2741,10 @@ global_symbol_table.set("LEN", BuiltInFunction.len)
 global_symbol_table.set("RUN", BuiltInFunction.run)
 
 
-def run(fn, text, context=None, entry_pos=None, return_result=False):
+def run(filename, text, context=None, entry_pos=None, return_result=False):
     """ 'RUN' Expanded to allow each script to have its own 'context' """
     # Generate tokens
-    lexer = Lexer(fn, text)
+    lexer = Lexer(filename, text)
     tokens, error = lexer.make_tokens()
     if error:
         return None, error
