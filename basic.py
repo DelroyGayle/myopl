@@ -7,7 +7,6 @@ from strings_with_arrows import *
 import string
 import os
 import math
-from dataclasses import dataclass
 
 #######################################
 # CONSTANTS
@@ -613,11 +612,11 @@ class BreakNode:
         self.pos_end = pos_end
 
 
-@dataclass
 class ImportNode:
-    string_node: StringNode
-    pos_start: Position
-    pos_end: Position
+    def __init__(self, string_node, pos_start, pos_end):
+        self.string_node = string_node
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
     def __repr__(self) -> str:
         return f"IMPORT {self.string_node!r}"
