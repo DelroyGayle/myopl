@@ -119,6 +119,7 @@ TOKEN_TYPE_PLUS = "PLUS"
 TOKEN_TYPE_MINUS = "MINUS"
 TOKEN_TYPE_MULTIPLY = "MULTIPLY"
 TOKEN_TYPE_DIVIDE = "DIVIDE"
+TOKEN_TYPE_MODULUS = "MODULUS"
 TOKEN_TYPE_POWER = "POWER"
 TOKEN_TYPE_ASSIGN = "ASSIGN"
 TOKEN_TYPE_LPAREN = "LPAREN"
@@ -238,6 +239,9 @@ class Lexer:
                 self.advance()
             elif self.current_char == "/":
                 tokens.append(Token(TOKEN_TYPE_DIVIDE, pos_start=self.pos))
+                self.advance()
+            elif self.current_char == "%":
+                tokens.append(Token(TOKEN_TYPE_MODULUS, pos_start=self.pos))
                 self.advance()
             elif self.current_char == "^":
                 tokens.append(Token(TOKEN_TYPE_POWER, pos_start=self.pos))
@@ -687,22 +691,22 @@ class ParseResult:
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
-        self.tok_idx = -1
+        self.token_index = -1
         self.advance()
 
     def advance(self):
-        self.tok_idx += 1
+        self.token_index += 1
         self.update_current_tok()
         return self.current_tok
 
     def reverse(self, amount=1):
-        self.tok_idx -= amount
+        self.token_index -= amount
         self.update_current_tok()
         return self.current_tok
 
     def update_current_tok(self):
-        if self.tok_idx >= 0 and self.tok_idx < len(self.tokens):
-            self.current_tok = self.tokens[self.tok_idx]
+        if self.token_index >= 0 and self.token_index < len(self.tokens):
+            self.current_tok = self.tokens[self.token_index]
 
     def parse(self):
         res = self.statements()
@@ -911,7 +915,8 @@ class Parser:
 
     def term(self):
         return self.bin_op(self.factor, (TOKEN_TYPE_MULTIPLY,
-                                         TOKEN_TYPE_DIVIDE)
+                                         TOKEN_TYPE_DIVIDE,
+                                         TOKEN_TYPE_MODULUS)
                            )
 
     def factor(self):
@@ -1652,16 +1657,19 @@ class Value:
     def added_to(self, other):
         return None, self.illegal_operation(other)
 
-    def subbed_by(self, other):
+    def subtracted_by(self, other):
         return None, self.illegal_operation(other)
 
-    def multed_by(self, other):
+    def multiplied_by(self, other):
         return None, self.illegal_operation(other)
 
-    def dived_by(self, other):
+    def divided_by(self, other):
         return None, self.illegal_operation(other)
 
-    def powed_by(self, other):
+    def modulused_by(self, other):
+        return None, self.illegal_operation(other)
+
+    def powered_by(self, other):
         return None, self.illegal_operation(other)
 
     def get_comparison_eq(self, other):
@@ -1713,6 +1721,7 @@ class Number(Value):
         super().__init__()
         self.value = value
 
+    # Addition
     def added_to(self, other):
         if isinstance(other, Number):
             return (
@@ -1722,7 +1731,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def subbed_by(self, other):
+    # Subtraction
+    def subtracted_by(self, other):
         if isinstance(other, Number):
             return (
                 Number(self.value - other.value).set_context(self.context),
@@ -1731,7 +1741,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def multed_by(self, other):
+    # Multiplication
+    def multiplied_by(self, other):
         if isinstance(other, Number):
             return (
                 Number(self.value * other.value).set_context(self.context),
@@ -1740,7 +1751,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def dived_by(self, other):
+    # Division
+    def divided_by(self, other):
         if isinstance(other, Number):
             if other.value == 0:
                 return None, RTError(
@@ -1757,15 +1769,35 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def powed_by(self, other):
+    # Modulus
+    def modulused_by(self, other):
         if isinstance(other, Number):
+            if other.value == 0:
+                return None, RTError(
+                    other.pos_start,
+                    other.pos_end,
+                    "Modulus using zero",
+                    self.context,
+                )
+
             return (
-                Number(self.value**other.value).set_context(self.context),
+                Number(self.value % other.value).set_context(self.context),
                 None,
             )
         else:
             return None, Value.illegal_operation(self, other)
 
+    # Power Operator
+    def powered_by(self, other):
+        if isinstance(other, Number):
+            return (
+                Number(self.value ** other.value).set_context(self.context),
+                None,
+            )
+        else:
+            return None, Value.illegal_operation(self, other)
+
+    # == Equal To
     def get_comparison_eq(self, other):
         if isinstance(other, Number):
             return (
@@ -1777,6 +1809,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
+    # != Not Equal To
     def get_comparison_ne(self, other):
         if isinstance(other, Number):
             return (
@@ -1788,6 +1821,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
+    # < Less Than
     def get_comparison_lt(self, other):
         if isinstance(other, Number):
             return (
@@ -1799,6 +1833,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
+    # > Greater Than
     def get_comparison_gt(self, other):
         if isinstance(other, Number):
             return (
@@ -1810,6 +1845,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
+    # <= Less Than Or Equal To
     def get_comparison_lte(self, other):
         if isinstance(other, Number):
             return (
@@ -1821,6 +1857,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
+    # >= Greater Than Or Equal To
     def get_comparison_gte(self, other):
         if isinstance(other, Number):
             return (
@@ -1832,6 +1869,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
+    # and Operator
     def anded_by(self, other):
         if isinstance(other, Number):
             return (
@@ -1843,6 +1881,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
+    # or Operator
     def ored_by(self, other):
         if isinstance(other, Number):
             return (
@@ -1854,6 +1893,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
+    # not Operator
     def notted(self):
         return (
             Number(1 if self.value == 0 else 0).set_context(self.context),
@@ -1926,12 +1966,14 @@ class List(Value):
         super().__init__()
         self.elements = elements
 
+    # Append element
     def added_to(self, other):
         new_list = self.copy()
         new_list.elements.append(other)
         return new_list, None
 
-    def subbed_by(self, other):
+    # Remove element using 'pop'
+    def subtracted_by(self, other):
         if isinstance(other, Number):
             new_list = self.copy()
             try:
@@ -1949,7 +1991,8 @@ class List(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def multed_by(self, other):
+    # Extend - Concatenation of Lists
+    def multiplied_by(self, other):
         if isinstance(other, List):
             new_list = self.copy()
             new_list.elements.extend(other.elements)
@@ -1957,7 +2000,8 @@ class List(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def dived_by(self, other):
+    # Fetch element
+    def divided_by(self, other):
         if isinstance(other, Number):
             try:
                 return self.elements[other.value], None
@@ -2487,13 +2531,15 @@ class Interpreter:
         if node.op_tok.type == TOKEN_TYPE_PLUS:
             result, error = left.added_to(right)
         elif node.op_tok.type == TOKEN_TYPE_MINUS:
-            result, error = left.subbed_by(right)
+            result, error = left.subtracted_by(right)
         elif node.op_tok.type == TOKEN_TYPE_MULTIPLY:
-            result, error = left.multed_by(right)
+            result, error = left.multiplied_by(right)
         elif node.op_tok.type == TOKEN_TYPE_DIVIDE:
-            result, error = left.dived_by(right)
+            result, error = left.divided_by(right)
+        elif node.op_tok.type == TOKEN_TYPE_MODULUS:
+            result, error = left.modulused_by(right)
         elif node.op_tok.type == TOKEN_TYPE_POWER:
-            result, error = left.powed_by(right)
+            result, error = left.powered_by(right)
         elif node.op_tok.type == TOKEN_TYPE_EQUAL_TO:
             result, error = left.get_comparison_eq(right)
         elif node.op_tok.type == TOKEN_TYPE_NOT_EQUAL_TO:
