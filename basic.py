@@ -802,6 +802,7 @@ class Parser:
             res.register_advancement()  # Advance past the NL
             self.advance()
 
+        # Parse a statement
         statement = res.register(self.statement())
         if res.error:
             # Error occurred with the very first statement!
@@ -1314,19 +1315,19 @@ class Parser:
         Parse IF Expression/Statement
 
         IF Expression:
-            IF expr1 KEYWORD:THEN expr2
-            IF expr1 KEYWORD:THEN expr2 ELSE expr3
-            IF expr1 KEYWORD:THEN expr2 ELIF expr3 ... ELIF ... END
-            IF expr1 KEYWORD:THEN expr2 ELIF expr3 ... ELSE expr END
+            IF condition THEN expr
+            IF condition THEN expr1 ELSE expr2
+            IF condition1 THEN expr1 ELIF condition2 THEN expr3 ... ELIF ... END
+            IF condition1 THEN expr1 ELIF condition2 THEN expr3 ... ELIF ... ELSE exprn END
 
         IF Multiline Statement:
-            IF expr KEYWORD:THEN
+            IF condition THEN
                 ...
                 ...
                 ...
             END
 
-            IF expr KEYWORD:THEN
+            IF condition THEN
                 ...
                 ...
                 ...
@@ -1336,40 +1337,68 @@ class Parser:
                 ...
             END
 
-            IF expr KEYWORD:THEN
+            IF condition THEN
                 ...
                 ...
-            ELIF expr
+            ELIF condition THEN
                 ...
                 ...
-            ELIF expr
+            ELIF condition THEN
                 ...
                 ...
             END
 
-            IF expr KEYWORD:THEN
+            IF condition THEN
                 ...
                 ...
-            ELIF expr
+            ELIF condition THEN
                 ...
                 ...
             ELSE
                 ...
                 ...
             END
+
+        Grammar:
+        if-expr     : KEYWORD:IF expr KEYWORD:THEN
+                     (statement if-expr-b|if-expr-c?)
+                    | (NEWLINE statements KEYWORD:END|if-expr-b|if-expr-c)
         """
 
         res = ParseResult()  # Initialise
+        # Parse the entire IF expression/statement
         all_cases = res.register(self.if_expr_cases("IF"))
         if res.error:
             return res
+        """ 
+        Split the result into a tuple
+        The first element contains all the IF/ELIF nodes
+        The second element contains the ELSE node
+        which could have the value 'None' if there is no ELSE expr
+        """
         cases, else_case = all_cases
         return res.success(IfNode(cases, else_case))
 
     def if_expr_b(self):
+        """
+        Parse all the ELIF expressions/statements
+
+        Grammar:
+        if-expr-b   : KEYWORD:ELIF expr KEYWORD:THEN
+                      (statement if-expr-b|if-expr-c?)
+                    | (NEWLINE statements KEYWORD:END|if-expr-b|if-expr-c)
+        """
         return self.if_expr_cases("ELIF")
 
     def if_expr_c(self):
+        """
+        Parse the ELSE expression/statement
+
+        Grammar:
+        if-expr-c   : KEYWORD:ELSE
+                      statement
+                    | (NEWLINE statements KEYWORD:END)
+        """
         res = ParseResult()  # Initialise
         else_case = None
 
@@ -1379,12 +1408,19 @@ class Parser:
 
             # Multiline ELSE begin with a newline \n or ;
             if self.current_tok.type == TOKEN_TYPE_NEWLINE:
+                # ELSE followed by a NL indicates a Multiline ELSE
                 res.register_advancement()  # Advance past the NL
                 self.advance()
 
+                # Parse the ELSE's Multiline statements
                 statements = res.register(self.statements())
                 if res.error:
                     return res
+
+                """
+                'True' indicates that 'should_return_null' is set to True
+                Because ELSE statement(s) do not return a value
+                """
                 else_case = (statements, True)
 
                 if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
@@ -1399,23 +1435,33 @@ class Parser:
                         )
                     )
             else:
+                # This is an ELSE expression - Parse it
                 expr = res.register(self.statement())
                 if res.error:
                     return res
+                
+                """
+                'False' indicates that 'should_return_null' is set to False
+                Because an ELSE expression does return a value
+                """
                 else_case = (expr, False)
 
+        # Successful ELSE parse
         return res.success(else_case)
 
     def if_expr_b_or_c(self):
+        """ Parse ELIF/ELSE Expressions/Statements """
         res = ParseResult()  # Initialise
         cases, else_case = [], None
 
         if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "ELIF"):
+            # Handle ELIF
             all_cases = res.register(self.if_expr_b())
             if res.error:
                 return res
             cases, else_case = all_cases
         else:
+            # Handle ELSE
             else_case = res.register(self.if_expr_c())
             if res.error:
                 return res
@@ -1423,6 +1469,7 @@ class Parser:
         return res.success((cases, else_case))
 
     def if_expr_cases(self, case_keyword):
+        """ Parse IF/ELIF Expressions/Statements """
         res = ParseResult()  # Initialise
         cases = []
         else_case = None
@@ -1436,9 +1483,12 @@ class Parser:
                 )
             )
 
-        res.register_advancement()  # Advance past the Keyword
+        # Advance past the Keyword in case_keyword
+        # i.e. advance past either 'IF' or 'ELIF'
+        res.register_advancement()
         self.advance()
 
+        # Parse the IF condition
         condition = res.register(self.expr())
         if res.error:
             return res
@@ -1460,24 +1510,37 @@ class Parser:
             res.register_advancement()  # Advance past the NL
             self.advance()
 
+            # Parse the Multiline statements
             statements = res.register(self.statements())
             if res.error:
                 return res
+            
+            """
+            'True' indicates that 'should_return_null' is set to True
+            Because IF statement(s) do not return a value
+            """
             cases.append((condition, statements, True))
 
             if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
                 res.register_advancement()  # Advance past END
                 self.advance()
             else:
+                # Handle ELIF and ELSE statements
                 all_cases = res.register(self.if_expr_b_or_c())
                 if res.error:
                     return res
                 new_cases, else_case = all_cases
                 cases.extend(new_cases)
         else:
+            # This is a single IF expression - Parse it
             expr = res.register(self.statement())
             if res.error:
                 return res
+            
+            """
+            'False' indicates that 'should_return_null' is set to False
+            Because an IF expression does return a value
+            """
             cases.append((condition, expr, False))
 
             all_cases = res.register(self.if_expr_b_or_c())
@@ -1486,9 +1549,35 @@ class Parser:
             new_cases, else_case = all_cases
             cases.extend(new_cases)
 
+        # Successful Parse
         return res.success((cases, else_case))
 
     def for_expr(self):
+        """
+        Parse FOR Expression/Statement
+
+        FOR Expression:
+            FOR identifier = expr1 TO expr2 THEN expr3
+            FOR identifier = expr1 TO expr2 STEP expr3 THEN expr4
+
+        FOR Multiline Statement:
+            FOR identifier = expr1 TO expr2 THEN
+                ...
+                ...
+            END
+
+            FOR identifier = expr1 TO expr2 STEP expr3 THEN
+                ...
+                ...
+            END
+
+        Grammar:
+        for-expr    : KEYWORD:FOR IDENTIFIER EQ expr KEYWORD:TO expr 
+                      (KEYWORD:STEP expr)? KEYWORD:THEN
+                      statement
+                    | (NEWLINE statements KEYWORD:END)
+
+        """
         res = ParseResult()  # Initialise
 
         if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "FOR"):
@@ -1528,6 +1617,7 @@ class Parser:
         res.register_advancement()  # Advance past =
         self.advance()
 
+        # Parse the FOR's initial expression
         start_value = res.register(self.expr())
         if res.error:
             return res
@@ -1544,6 +1634,7 @@ class Parser:
         res.register_advancement()  # Advance past TO
         self.advance()
 
+        # Parse the FOR's TO expression
         end_value = res.register(self.expr())
         if res.error:
             return res
@@ -1552,10 +1643,12 @@ class Parser:
             res.register_advancement()  # Advance past STEP
             self.advance()
 
+            # Parse the FOR's STEP expression
             step_value = res.register(self.expr())
             if res.error:
                 return res
         else:
+            # This indicates that there is no STEP expression
             step_value = None
 
         if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "THEN"):
@@ -1575,6 +1668,7 @@ class Parser:
             res.register_advancement()  # Advance past the NL
             self.advance()
 
+            # Parse the FOR's Multiline statements
             body = res.register(self.statements())
             if res.error:
                 return res
@@ -1591,21 +1685,44 @@ class Parser:
             res.register_advancement()  # Advance past END
             self.advance()
 
+            """
+            Successful Parse
+            'True' indicates that 'should_return_null' is set to True
+            Because FOR statement(s) do not return a value
+            """
             return res.success(
                 ForNode(
                     var_name, start_value, end_value, step_value, body, True
                 )
             )
 
+        # This is a single FOR expression - Parse it
         body = res.register(self.statement())
         if res.error:
             return res
 
+        """
+        Successful Parse
+        'False' indicates that 'should_return_null' is set to False
+        Because a FOR expression does return a value
+        """
         return res.success(
             ForNode(var_name, start_value, end_value, step_value, body, False)
         )
 
     def while_expr(self):
+        """
+        Parse WHILE Expression/Statement
+
+        WHILE Expression:
+            WHILE expr1 THEN expr2
+
+        WHILE Multiline Statement:
+            WHILE expr THEN
+                ...
+                ...
+            END
+        """
         res = ParseResult()  # Initialise
 
         if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "WHILE"):
@@ -1620,6 +1737,7 @@ class Parser:
         res.register_advancement()  # Advance past WHILE
         self.advance()
 
+        # Parse the WHILE condition
         condition = res.register(self.expr())
         if res.error:
             return res
@@ -1641,6 +1759,7 @@ class Parser:
             res.register_advancement()  # Advance past the NL
             self.advance()
 
+            # Parse the WHILE's Multiline statements
             body = res.register(self.statements())
             if res.error:
                 return res
@@ -1657,15 +1776,44 @@ class Parser:
             res.register_advancement()  # Advance past END
             self.advance()
 
+            """
+            Successful Parse
+            'True' indicates that 'should_return_null' is set to True
+            Because WHILE statement(s) do not return a value
+            """
             return res.success(WhileNode(condition, body, True))
 
+        # This is a single WHILE expression - Parse it
         body = res.register(self.statement())
         if res.error:
             return res
 
+        """
+        Successful Parse
+        'False' indicates that 'should_return_null' is set to False
+        Because a WHILE expression does return a value
+        """
         return res.success(WhileNode(condition, body, False))
 
     def func_def(self):
+        """
+        Parse FUN Expression/Statement
+        
+        FUN Expression:
+            FUN function_name (parameter(s)) -> expr
+            e.g. FUN afunc(a,b) -> a + b            
+            
+            FUN (parameter(s)) -> expr
+            Anonymous Function
+            e.g. FUN (a,b) -> a + b
+
+            FUN function_name () -> expr
+            e.g. FUN pi() -> 3.141592558
+
+            FUN () -> expr
+            Anonymous Function
+            e.g. FUN () -> 3.141592558
+        """
         res = ParseResult()  # Initialise
 
         if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "FUN"):
@@ -1681,6 +1829,7 @@ class Parser:
         self.advance()
 
         if self.current_tok.type == TOKEN_TYPE_IDENTIFIER:
+            # Parse FUN function_name (parameter(s)) -> expr
             var_name_tok = self.current_tok
             res.register_advancement()  # Advance past the Identifier
             self.advance()
@@ -1693,6 +1842,7 @@ class Parser:
                     )
                 )
         else:
+            # Parse anonymous function FUN (parameter(s)) -> expr
             var_name_tok = None
             if self.current_tok.type != TOKEN_TYPE_LPAREN:
                 return res.failure(
@@ -1703,15 +1853,17 @@ class Parser:
                     )
                 )
 
-        res.register_advancement()  # Advance past the Left Parenthesis
+        res.register_advancement()  # Advance past the Opening Parenthesis
         self.advance()
         arg_name_toks = []
 
         if self.current_tok.type == TOKEN_TYPE_IDENTIFIER:
+            # Parse the first parameter
             arg_name_toks.append(self.current_tok)
             res.register_advancement()  # Advance past the Identifier
             self.advance()
 
+            # Optionally more parameters could follow preceded by a comma
             while self.current_tok.type == TOKEN_TYPE_COMMA:
                 res.register_advancement()  # Advance past ,
                 self.advance()
@@ -1725,6 +1877,7 @@ class Parser:
                         )
                     )
 
+                # Parse a parameter
                 arg_name_toks.append(self.current_tok)
                 res.register_advancement()  # Advance past the Identifier
                 self.advance()
@@ -1747,17 +1900,21 @@ class Parser:
                     )
                 )
 
-        res.register_advancement()  # Advance past the Right Parenthesis
+        res.register_advancement()  # Advance past the Closing Parenthesis
         self.advance()
 
         if self.current_tok.type == TOKEN_TYPE_ARROW:
             res.register_advancement()  # Advance past ->
             self.advance()
 
+            # Parse the function definition's body
             body = res.register(self.expr())
             if res.error:
                 return res
 
+            """
+            Successful Parse
+            """
             return res.success(
                 FuncDefNode(var_name_tok, arg_name_toks, body, True)
             )
@@ -1774,6 +1931,7 @@ class Parser:
         res.register_advancement()  # Advance past the NL
         self.advance()
 
+        # Parse the FUN's Multiline statements
         body = res.register(self.statements())
         if res.error:
             return res
@@ -1790,6 +1948,7 @@ class Parser:
         res.register_advancement()  # Advance past END
         self.advance()
 
+        # Successful Parse
         return res.success(
             FuncDefNode(var_name_tok, arg_name_toks, body, False)
         )
@@ -1872,10 +2031,10 @@ class RTResult:
         # Note: this will allow you to continue and
         # break outside the current function
         return (
-            self.error
-            or self.func_return_value
-            or self.loop_should_continue
-            or self.loop_should_break
+            self.error  # an error has occurred
+            or self.func_return_value  # a function has returned
+            or self.loop_should_continue  # executing a continue the loop
+            or self.loop_should_break  # executing a break from loop
         )
 
 
@@ -1965,8 +2124,8 @@ class Number(Value):
         super().__init__()
         self.value = value
 
-    # Addition
     def added_to(self, other):
+        """ Addition: number1 + number2 """
         if isinstance(other, Number):
             return (
                 Number(self.value + other.value).set_context(self.context),
@@ -1975,8 +2134,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # Subtraction
     def subtracted_by(self, other):
+        """ Subtraction: number1 - number2 """
         if isinstance(other, Number):
             return (
                 Number(self.value - other.value).set_context(self.context),
@@ -1985,8 +2144,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # Multiplication
     def multiplied_by(self, other):
+        """ Multiplication: number1 * number2 """
         if isinstance(other, Number):
             return (
                 Number(self.value * other.value).set_context(self.context),
@@ -1995,8 +2154,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # Division
     def divided_by(self, other):
+        """ Division: number1 / number2 """
         if isinstance(other, Number):
             if other.value == 0:
                 return None, RTError(
@@ -2013,8 +2172,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # Modulus
     def modulused_by(self, other):
+        """ Modulus/Remainder: number1 % number2 """
         if isinstance(other, Number):
             if other.value == 0:
                 return None, RTError(
@@ -2031,8 +2190,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # Power Operator
     def powered_by(self, other):
+        """ Power Operator/Exponentiation: number1 ^ number2 """
         if isinstance(other, Number):
             return (
                 Number(self.value ** other.value).set_context(self.context),
@@ -2041,8 +2200,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # == Equal To
     def get_comparison_eq(self, other):
+        """ == Equal To """
         if isinstance(other, Number):
             return (
                 Number(int(self.value == other.value)).set_context(
@@ -2053,8 +2212,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # != Not Equal To
     def get_comparison_ne(self, other):
+        """ != Not Equal To """
         if isinstance(other, Number):
             return (
                 Number(int(self.value != other.value)).set_context(
@@ -2065,8 +2224,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # < Less Than
     def get_comparison_lt(self, other):
+        """ < Less Than """
         if isinstance(other, Number):
             return (
                 Number(int(self.value < other.value)).set_context(
@@ -2077,8 +2236,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # > Greater Than
     def get_comparison_gt(self, other):
+        """ > Greater Than """
         if isinstance(other, Number):
             return (
                 Number(int(self.value > other.value)).set_context(
@@ -2089,8 +2248,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # <= Less Than Or Equal To
     def get_comparison_lte(self, other):
+        """ <= Less Than Or Equal To """
         if isinstance(other, Number):
             return (
                 Number(int(self.value <= other.value)).set_context(
@@ -2101,8 +2260,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # >= Greater Than Or Equal To
     def get_comparison_gte(self, other):
+        """ >= Greater Than Or Equal To """
         if isinstance(other, Number):
             return (
                 Number(int(self.value >= other.value)).set_context(
@@ -2113,8 +2272,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # and Operator
     def anded_by(self, other):
+        """ and Operator """
         if isinstance(other, Number):
             return (
                 Number(int(self.value and other.value)).set_context(
@@ -2125,8 +2284,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # or Operator
     def ored_by(self, other):
+        """ or Operator """
         if isinstance(other, Number):
             return (
                 Number(int(self.value or other.value)).set_context(
@@ -2137,8 +2296,8 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # not Operator
     def notted(self):
+        """ not Operator """
         return (
             Number(1 if self.value == 0 else 0).set_context(self.context),
             None,
@@ -2172,6 +2331,7 @@ class String(Value):
         self.value = value
 
     def added_to(self, other):
+        """ String Concatenation: string1 + string2 """
         if isinstance(other, String):
             return (
                 String(self.value + other.value).set_context(self.context),
@@ -2181,6 +2341,7 @@ class String(Value):
             return None, Value.illegal_operation(self, other)
 
     def multed_by(self, other):
+        """ Repeat a String: string * number """
         if isinstance(other, Number):
             return (
                 String(self.value * other.value).set_context(self.context),
@@ -2210,14 +2371,14 @@ class List(Value):
         super().__init__()
         self.elements = elements
 
-    # Append element
     def added_to(self, other):
+        """ Append element: list + element """
         new_list = self.copy()
         new_list.elements.append(other)
         return new_list, None
 
-    # Remove element using 'pop'
     def subtracted_by(self, other):
+        """ Remove element using 'pop': list - number """
         if isinstance(other, Number):
             new_list = self.copy()
             try:
@@ -2235,8 +2396,8 @@ class List(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # Extend - Concatenation of Lists
     def multiplied_by(self, other):
+        """ Extend - Concatenation of Lists: list1 * list2 """
         if isinstance(other, List):
             new_list = self.copy()
             new_list.elements.extend(other.elements)
@@ -2244,8 +2405,8 @@ class List(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    # Fetch element
     def divided_by(self, other):
+        """ Fetch element: list / number """
         if isinstance(other, Number):
             try:
                 return self.elements[other.value], None
