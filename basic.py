@@ -283,24 +283,56 @@ class Lexer:
         tokens.append(Token(TOKEN_TYPE_EOF, pos_start=self.pos))
         return tokens, None
 
+    def make_exponent_number(self, num_str, pos_start):
+        """
+        An 'e' has been detected so at this point
+        parse a floating point number which uses exponential notation
+        e.g. 1.2e8 -2e4 -5e-5 +6e6 +1E6 1e-003
+        """
+        exponent_str = ""
+        sign_str = ""
+        if self.current_char in ["+", "-"]:
+            sign_str = self.current_char
+            self.advance()  # advance past the sign
+
+        while (self.current_char is not None and
+               self.current_char in c.DIGITS):
+            exponent_str += self.current_char
+            self.advance()  # advance past the digit
+
+        return Token(TOKEN_TYPE_FLOAT, 
+                     float(num_str + 'e' + sign_str + exponent_str), 
+                     pos_start,
+                     self.pos)
+
     def make_number(self):
         num_str = ""
         dot_count = 0
         pos_start = self.pos.copy()
 
         while (self.current_char is not None and
-               self.current_char in c.DIGITS + "."):
+               self.current_char in c.NUMBER_CHARS):
+
             if self.current_char == ".":
                 if dot_count == 1:
                     # Numbers do not have two dots
                     break
                 dot_count += 1
+            elif self.current_char in ["e", "E"]:
+    
+                # Parse a floating-point number
+                # which uses exponential notation
+                self.advance()  # advance past the 'e'
+                return self.make_exponent_number(num_str, pos_start)
+
             num_str += self.current_char
-            self.advance()
+            self.advance()  # advance past the digit or '.'
 
         if dot_count == 0:
+            # integer
             return Token(TOKEN_TYPE_INT, int(num_str), pos_start, self.pos)
         else:
+            # float/decimal number
             return Token(TOKEN_TYPE_FLOAT, float(num_str), pos_start, self.pos)
 
     def make_string(self):
@@ -2357,7 +2389,7 @@ class String(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def multed_by(self, other):
+    def multplied_by(self, other):
         """ Repeat a String: string * number """
         if isinstance(other, Number):
             return (
@@ -3035,7 +3067,7 @@ class Interpreter:
 
         if node.op_tok.type == TOKEN_TYPE_MINUS:
             # -x
-            number, error = number.multed_by(Number(-1))
+            number, error = number.multiplied_by(Number(-1))
         elif node.op_tok.matches(TOKEN_TYPE_KEYWORD, "NOT"):
             # NOT x
             number, error = number.notted()
