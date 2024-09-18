@@ -16,6 +16,8 @@ ERR = {}
 
 ERRORS = {
   # SYNTAX ERRORS
+  "unterminated_string": "Unterminated String",
+  "unterminated_ML_comment": "Unterminated Multiline Comment",
   "tokens_out_of_place": "Token cannot appear after previous tokens",
   "string_expected": "Expected string",
   "statement_syntax_error": ("Expected 'RETURN', 'CONTINUE', 'BREAK', 'VAR', "
@@ -54,6 +56,11 @@ ERRORS = {
   "arg1_list_expected": "First argument must be a list",
   "arg2_list_expected": "Second argument must be a list",
   "arg2_number_expected": "Second argument must be a string",
+  "exponent_overflow": "Exponential number too large, >= 1e308",
+  "exponent_underflow": "Exponential number too small, <= 1e-308",
+  "exponent_error": "Floating point number in exponential notation expected",
+  "number_overflow": "Number too large",
+  "number_conversion_error": "Could not convert this to a number",
   # RUNTIME ERRORS
   "division_by_zero": "Division by zero",
   "modulus_by_zero": "Modulus using zero",

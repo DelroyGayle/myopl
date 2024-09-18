@@ -219,7 +219,12 @@ class Lexer:
                 tokens.append(Token(TOKEN_TYPE_NEWLINE, pos_start=self.pos))
                 self.advance()
             elif self.current_char in c.DIGITS:
-                tokens.append(self.make_number())
+                result, error = self.make_number()
+                if error:
+                    return [], error
+
+                tokens.append(result)
+
             elif self.current_char in c.LETTERS:
                 tokens.append(self.make_identifier())
             elif self.current_char == '"':
@@ -262,7 +267,9 @@ class Lexer:
                 token, error = self.make_not_equals()  # !=
                 if error:
                     return [], error
+
                 tokens.append(token)
+
             elif self.current_char == "=":
                 tokens.append(self.make_equals())  # Handle = ==
             elif self.current_char == "<":
@@ -300,10 +307,36 @@ class Lexer:
             exponent_str += self.current_char
             self.advance()  # advance past the digit
 
-        return Token(TOKEN_TYPE_FLOAT, 
-                     float(num_str + 'e' + sign_str + exponent_str), 
-                     pos_start,
-                     self.pos)
+        try:
+            thenumber = float(num_str + 'e' + sign_str + exponent_str)
+            """
+            Python uses JavaScript's Number.MAX_VALUE
+            which is approximately 1.7976931348623157E+308
+            Anything above that is given the value of Infinity i.e. 'inf'
+            Check for this
+            Alternatively, Use 1e308 as the limit for a number too big!
+            """
+            if (math.isinf(thenumber) or
+               (thelog10 := math.log10(thenumber)) >= 308):
+                raise OverflowError
+            elif thelog10 <= -308:
+                return (None, InvalidSyntaxError(pos_start, self.pos,
+                        c.ERRORS["exponent_underflow"]))
+
+            # Successful Parse
+            return Token(TOKEN_TYPE_FLOAT,
+                         thenumber,
+                         pos_start,
+                         self.pos), None
+
+        except (OverflowError, MemoryError):
+            return (None, InvalidSyntaxError(pos_start, self.pos,
+                    c.ERRORS["exponent_overflow"]))
+
+        except ValueError:
+            # Number Conversion Error
+            return (None, InvalidSyntaxError(pos_start, self.pos,
+                    c.ERRORS["exponent_error"]))
 
     def make_number(self):
         num_str = ""
@@ -318,8 +351,8 @@ class Lexer:
                     # Numbers do not have two dots
                     break
                 dot_count += 1
+
             elif self.current_char in ["e", "E"]:
-    
                 # Parse a floating-point number
                 # which uses exponential notation
                 self.advance()  # advance past the 'e'
@@ -328,12 +361,35 @@ class Lexer:
             num_str += self.current_char
             self.advance()  # advance past the digit or '.'
 
-        if dot_count == 0:
-            # integer
-            return Token(TOKEN_TYPE_INT, int(num_str), pos_start, self.pos)
-        else:
-            # float/decimal number
-            return Token(TOKEN_TYPE_FLOAT, float(num_str), pos_start, self.pos)
+        try:
+            thenumber = (int(num_str) if dot_count == 0 
+                         else float(num_str))
+            # Check whether the comverted number is too big
+            if (math.isinf(thenumber) or math.log10(thenumber)) >= 308:
+                raise OverflowError
+
+            # Successful Convert to Number
+            if dot_count == 0:
+                # integer
+                return Token(TOKEN_TYPE_INT,
+                            thenumber,
+                            pos_start,
+                            self.pos), None
+            else:
+                # float/decimal number
+                return Token(TOKEN_TYPE_FLOAT,
+                            thenumber,
+                            pos_start,
+                            self.pos), None
+            
+        except (OverflowError, MemoryError):
+            return (None, InvalidSyntaxError(pos_start, self.pos,
+                    c.ERRORS["number_overflow"]))
+
+        except ValueError:
+            # Number Conversion Error
+            return (None, InvalidSyntaxError(pos_start, self.pos,
+                    c.ERRORS["number_conversion_error"]))
 
     def make_string(self):
         string = ""
@@ -364,7 +420,7 @@ class Lexer:
             pos_start = self.pos.copy()
 
             return (None, InvalidSyntaxError(pos_start, self.pos,
-                    "Unterminated String"))
+                    c.ERRORS["unterminated_string"]))
 
         # Advance past the closing quote "
         self.advance()
@@ -486,7 +542,7 @@ class Lexer:
                     pos_start.linenum -= 1
 
                 return (None, InvalidSyntaxError(pos_start, self.pos,
-                        "Unterminated Multiline Comment"))
+                        c.ERRORS["unterminated_ML_comment"]))
 
             self.advance()
 
@@ -1139,7 +1195,7 @@ class Parser:
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            c.ERRORS["arg1_syntax_error"],                    
+                            c.ERRORS["arg1_syntax_error"],
                         )
                     )
 
@@ -2792,7 +2848,7 @@ class BuiltInFunction(BaseFunction):
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    c.ERRORS["arg2_list_expected"],                    
+                    c.ERRORS["arg2_list_expected"],
                     execution_context,
                 )
             )
