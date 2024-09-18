@@ -570,14 +570,14 @@ class ForNode:
         end_value_node,
         step_value_node,
         body_node,
-        should_return_null,
+        should_return_none,
     ):
         self.var_name_tok = var_name_tok
         self.start_value_node = start_value_node
         self.end_value_node = end_value_node
         self.step_value_node = step_value_node
         self.body_node = body_node
-        self.should_return_null = should_return_null
+        self.should_return_none = should_return_none
 
         # Record the beginning of the FOR Expression
         self.pos_start = self.var_name_tok.pos_start
@@ -586,10 +586,10 @@ class ForNode:
 
 
 class WhileNode:
-    def __init__(self, condition_node, body_node, should_return_null):
+    def __init__(self, condition_node, body_node, should_return_none):
         self.condition_node = condition_node
         self.body_node = body_node
-        self.should_return_null = should_return_null
+        self.should_return_none = should_return_none
 
         # Record the beginning of the WHILE Expression
         self.pos_start = self.condition_node.pos_start
@@ -640,7 +640,11 @@ class CallNode:
 
 class ReturnNode:
     def __init__(self, node_to_return, pos_start, pos_end):
-        # This node represents the Return Value
+        """
+        This node represents the Return Value
+        'node_to_return' will have the value of 'None'
+        if a RETURN without an expression was parsed
+        """
         self.node_to_return = node_to_return
 
         self.pos_start = pos_start
@@ -881,6 +885,7 @@ class Parser:
             if not expr:
                 # No! Revert to original position
                 # This is a RETURN without an EXPR
+                # therefore 'expr' has the value of None
                 self.reverse(res.to_reverse_count)
 
             return res.success(
@@ -1317,8 +1322,8 @@ class Parser:
         IF Expression:
             IF condition THEN expr
             IF condition THEN expr1 ELSE expr2
-            IF condition1 THEN expr1 ELIF condition2 THEN expr3 ... ELIF ... END
-            IF condition1 THEN expr1 ELIF condition2 THEN expr3 ... ELIF ... ELSE exprn END
+            IF cond1 THEN expr1 ELIF cond2 THEN expr3 ... ELIF ... END
+            IF c1 THEN expr1 ELIF c2 THEN expr3 ... ELIF ... ELSE exprn END
 
         IF Multiline Statement:
             IF condition THEN
@@ -1370,7 +1375,8 @@ class Parser:
         all_cases = res.register(self.if_expr_cases("IF"))
         if res.error:
             return res
-        """ 
+
+        """
         Split the result into a tuple
         The first element contains all the IF/ELIF nodes
         The second element contains the ELSE node
@@ -1418,7 +1424,7 @@ class Parser:
                     return res
 
                 """
-                'True' indicates that 'should_return_null' is set to True
+                'True' indicates that 'should_return_none' is set to True
                 Because ELSE statement(s) do not return a value
                 """
                 else_case = (statements, True)
@@ -1439,9 +1445,9 @@ class Parser:
                 expr = res.register(self.statement())
                 if res.error:
                     return res
-                
+
                 """
-                'False' indicates that 'should_return_null' is set to False
+                'False' indicates that 'should_return_none' is set to False
                 Because an ELSE expression does return a value
                 """
                 else_case = (expr, False)
@@ -1514,9 +1520,9 @@ class Parser:
             statements = res.register(self.statements())
             if res.error:
                 return res
-            
+
             """
-            'True' indicates that 'should_return_null' is set to True
+            'True' indicates that 'should_return_none' is set to True
             Because IF statement(s) do not return a value
             """
             cases.append((condition, statements, True))
@@ -1536,9 +1542,9 @@ class Parser:
             expr = res.register(self.statement())
             if res.error:
                 return res
-            
+
             """
-            'False' indicates that 'should_return_null' is set to False
+            'False' indicates that 'should_return_none' is set to False
             Because an IF expression does return a value
             """
             cases.append((condition, expr, False))
@@ -1572,7 +1578,7 @@ class Parser:
             END
 
         Grammar:
-        for-expr    : KEYWORD:FOR IDENTIFIER EQ expr KEYWORD:TO expr 
+        for-expr    : KEYWORD:FOR IDENTIFIER EQ expr KEYWORD:TO expr
                       (KEYWORD:STEP expr)? KEYWORD:THEN
                       statement
                     | (NEWLINE statements KEYWORD:END)
@@ -1617,7 +1623,7 @@ class Parser:
         res.register_advancement()  # Advance past =
         self.advance()
 
-        # Parse the FOR's initial expression
+        # Parse the FOR's Start expression
         start_value = res.register(self.expr())
         if res.error:
             return res
@@ -1634,7 +1640,7 @@ class Parser:
         res.register_advancement()  # Advance past TO
         self.advance()
 
-        # Parse the FOR's TO expression
+        # Parse the FOR's TO/End expression
         end_value = res.register(self.expr())
         if res.error:
             return res
@@ -1687,7 +1693,7 @@ class Parser:
 
             """
             Successful Parse
-            'True' indicates that 'should_return_null' is set to True
+            'True' indicates that 'should_return_none' is set to True
             Because FOR statement(s) do not return a value
             """
             return res.success(
@@ -1703,7 +1709,7 @@ class Parser:
 
         """
         Successful Parse
-        'False' indicates that 'should_return_null' is set to False
+        'False' indicates that 'should_return_none' is set to False
         Because a FOR expression does return a value
         """
         return res.success(
@@ -1778,7 +1784,7 @@ class Parser:
 
             """
             Successful Parse
-            'True' indicates that 'should_return_null' is set to True
+            'True' indicates that 'should_return_none' is set to True
             Because WHILE statement(s) do not return a value
             """
             return res.success(WhileNode(condition, body, True))
@@ -1790,7 +1796,7 @@ class Parser:
 
         """
         Successful Parse
-        'False' indicates that 'should_return_null' is set to False
+        'False' indicates that 'should_return_none' is set to False
         Because a WHILE expression does return a value
         """
         return res.success(WhileNode(condition, body, False))
@@ -1798,11 +1804,11 @@ class Parser:
     def func_def(self):
         """
         Parse FUN Expression/Statement
-        
+
         FUN Expression:
             FUN function_name (parameter(s)) -> expr
-            e.g. FUN afunc(a,b) -> a + b            
-            
+            e.g. FUN afunc(a,b) -> a + b
+
             FUN (parameter(s)) -> expr
             Anonymous Function
             e.g. FUN (a,b) -> a + b
@@ -1914,7 +1920,11 @@ class Parser:
 
             """
             Successful Parse
+            'True' indicates that 'should_auto_return' is set to True
+            This means that this is an 'Arrow' function defined with ->
+            Such functions AUTOmatically return a value after execution
             """
+
             return res.success(
                 FuncDefNode(var_name_tok, arg_name_toks, body, True)
             )
@@ -1948,7 +1958,22 @@ class Parser:
         res.register_advancement()  # Advance past END
         self.advance()
 
-        # Successful Parse
+        """
+        Successful Parse
+        'False' indicates that 'should_auto_return' is set to False
+        This means that this is a non-arrow function.
+        It acts more like a procedure.
+        Therefore, there may be no return value at all!
+        That is,
+        1) If thIS function executes a RETURN expr
+        the value of this expresson would be returned
+        2) If this function executes a RETURN without an expr
+        a None value of 0 will be returned viz. 'Number.none'
+        3) If the function executes no RETURN at all,
+        a None value of 0 will be returned when the function as ended
+        viz. 'Number.none'
+        """
+
         return res.success(
             FuncDefNode(var_name_tok, arg_name_toks, body, False)
         )
@@ -2028,13 +2053,14 @@ class RTResult:
         return self
 
     def should_return(self):
-        # Note: this will allow you to continue and
-        # break outside the current function
+        # Note: this will allow you to 'continue' a loop and
+        # 'break' a loop as well as
+        # 'break' outside the current function
         return (
             self.error  # an error has occurred
-            or self.func_return_value  # a function has returned
-            or self.loop_should_continue  # executing a continue the loop
-            or self.loop_should_break  # executing a break from loop
+            or self.func_return_value  # executing a RETURN from a function
+            or self.loop_should_continue  # executing a CONTINUE the loop
+            or self.loop_should_break  # executing a BREAK from loop
         )
 
 
@@ -2319,7 +2345,7 @@ class Number(Value):
         return str(self.value)
 
 
-Number.null = Number(0)
+Number.none = Number(0)
 Number.false = Number(0)
 Number.true = Number(1)
 Number.math_PI = Number(math.pi)
@@ -2452,7 +2478,7 @@ class BaseFunction(Value):
         return new_context
 
     def check_args(self, arg_names, args):
-        res = RTResult()
+        res = RTResult()  # initialise
 
         if len(args) > len(arg_names):
             errormess = (f"{len(args) - len(arg_names)} too many args "
@@ -2488,10 +2514,15 @@ class BaseFunction(Value):
             execution_context.symbol_table.set(arg_name, arg_value)
 
     def check_and_populate_args(self, arg_names, args, execution_context):
-        res = RTResult()
+        res = RTResult()  # initialise
+        # Check that the number of parameters
+        # and the number of arguments match
         res.register(self.check_args(arg_names, args))
         if res.should_return():
+            # Error occurred i.e. the numbers don't match!
             return res
+
+        # Populate the arguments with their corresponding values
         self.populate_args(arg_names, args, execution_context)
         return res.success(None)
 
@@ -2504,26 +2535,46 @@ class Function(BaseFunction):
         self.should_auto_return = should_auto_return
 
     def execute(self, args):
-        res = RTResult()
-        interpreter = Interpreter()
+        res = RTResult()  # initialise
+        interpreter = Interpreter()  # initialise the Interpreter
         execution_context = self.generate_new_context()
 
+        # Perform initial checks such as matching number of args
         res.register(
             self.check_and_populate_args(self.arg_names, args,
                                          execution_context)
         )
         if res.should_return():
+            # An error has occurred - the checks have failed
             return res
 
-        value = res.register(interpreter.visit(self.body_node,
-                                               execution_context))
+        # Execute the Function using the Interpreter
+        thevalue = res.register(interpreter.visit(self.body_node,
+                                                  execution_context))
+
         if res.should_return() and res.func_return_value is None:
+            # An error has occurred or
+            # a 'None' value must be returned at this point
             return res
+
+        """
+        Determine the 'return value'
+        If 'self.should_auto_return' is true:
+            set ret_value to whatever value is in 'thevalue'
+        else:
+            set ret_value to Number.none
+
+        However if after this assignment, 'ret_value' is falsy:
+            then set ret_value to 'res.func_return_value'
+
+        However if after this assignment, 'ret_value' is still falsy:
+            then set ret_value to 'Number.none'
+        """
 
         ret_value = (
-            (value if self.should_auto_return else None)
+            (thevalue if self.should_auto_return else None)
             or res.func_return_value
-            or Number.null
+            or Number.none
         )
         return res.success(ret_value)
 
@@ -2578,7 +2629,7 @@ class BuiltInFunction(BaseFunction):
 
     def execute_print(self, execution_context):
         print(str(execution_context.symbol_table.get("value")))
-        return RTResult().success(Number.null)
+        return RTResult().success(Number.none)
 
     execute_print.arg_names = ["value"]
 
@@ -2609,7 +2660,7 @@ class BuiltInFunction(BaseFunction):
 
     def execute_clear(self, execution_context):
         os.system("cls" if os.name == "nt" else "cls")
-        return RTResult().success(Number.null)
+        return RTResult().success(Number.none)
 
     execute_clear.arg_names = []
 
@@ -2643,6 +2694,7 @@ class BuiltInFunction(BaseFunction):
     execute_is_function.arg_names = ["value"]
 
     def execute_append(self, execution_context):
+        """ Mutable Append element: append(list, value) """
         list_ = execution_context.symbol_table.get("list")
         value = execution_context.symbol_table.get("value")
 
@@ -2657,11 +2709,12 @@ class BuiltInFunction(BaseFunction):
             )
 
         list_.elements.append(value)
-        return RTResult().success(Number.null)
+        return RTResult().success(Number.none)
 
     execute_append.arg_names = ["list", "value"]
 
     def execute_pop(self, execution_context):
+        """ Mutable Remove/Pop element: pop(list, index) """
         list_ = execution_context.symbol_table.get("list")
         index = execution_context.symbol_table.get("index")
 
@@ -2703,6 +2756,7 @@ class BuiltInFunction(BaseFunction):
     execute_pop.arg_names = ["list", "index"]
 
     def execute_extend(self, execution_context):
+        """ Mutable Extend - Concatenation of Lists: extend(listA, listB) """
         listA = execution_context.symbol_table.get("listA")
         listB = execution_context.symbol_table.get("listB")
 
@@ -2727,11 +2781,12 @@ class BuiltInFunction(BaseFunction):
             )
 
         listA.elements.extend(listB.elements)
-        return RTResult().success(Number.null)
+        return RTResult().success(Number.none)
 
     execute_extend.arg_names = ["listA", "listB"]
 
     def execute_len(self, execution_context):
+        """ Length of list: len(list) """
         list_ = execution_context.symbol_table.get("list")
 
         if not isinstance(list_, List):
@@ -2749,6 +2804,10 @@ class BuiltInFunction(BaseFunction):
     execute_len.arg_names = ["list"]
 
     def execute_run(self, execution_context):
+        """
+        Run File Script: run(filename)
+        run() is deprecated. Use 'IMPORT' instead
+        """
         filename = execution_context.symbol_table.get("filename")
 
         if not isinstance(filename, String):
@@ -2791,7 +2850,7 @@ class BuiltInFunction(BaseFunction):
                 )
             )
 
-        return RTResult().success(Number.null)
+        return RTResult().success(Number.none)
 
     execute_run.arg_names = ["filename"]
 
@@ -2835,15 +2894,22 @@ class SymbolTable:
         self.parent = parent
 
     def get(self, name):
+        """
+        Recursively using the 'parent' determine
+        the value of the variable
+        Return 'None' if no such value is found
+        """
         value = self.symbols.get(name, None)
         if value is None and self.parent:
             return self.parent.get(name)
         return value
 
     def set(self, name, value):
+        """ Set the named variable to this value """
         self.symbols[name] = value
 
     def remove(self, name):
+        """ Removed the named variable from the symbol table """
         del self.symbols[name]
 
 
@@ -2884,8 +2950,10 @@ class Interpreter:
         for element_node in node.element_nodes:
             elements.append(res.register(self.visit(element_node, context)))
             if res.should_return():
+                # An error has occurred
                 return res
 
+        # List successfully created
         return res.success(
             List(elements)
             .set_context(context)
@@ -2893,7 +2961,7 @@ class Interpreter:
         )
 
     def visit_VarAccessNode(self, node, context):
-        res = RTResult()
+        res = RTResult()  # Initialise
         var_name = node.var_name_tok.value
         value = context.symbol_table.get(var_name)
 
@@ -2915,22 +2983,26 @@ class Interpreter:
         return res.success(value)
 
     def visit_VarAssignNode(self, node, context):
-        res = RTResult()
+        res = RTResult()  # Initialise
         var_name = node.var_name_tok.value
         value = res.register(self.visit(node.value_node, context))
         if res.should_return():
+            # An error has occurred whilst trying to determine this variable
             return res
 
+        # Set the variable to this value i.e. VAR = VALUE
         context.symbol_table.set(var_name, value)
         return res.success(value)
 
     def visit_BinOpNode(self, node, context):
-        res = RTResult()
+        res = RTResult()  # Initialise
         left = res.register(self.visit(node.left_node, context))
         if res.should_return():
+            # An error has occurred
             return res
         right = res.register(self.visit(node.right_node, context))
         if res.should_return():
+            # An error has occurred
             return res
 
         if node.op_tok.type == TOKEN_TYPE_PLUS:
@@ -2968,16 +3040,19 @@ class Interpreter:
             return res.success(result.set_pos(node.pos_start, node.pos_end))
 
     def visit_UnaryOpNode(self, node, context):
-        res = RTResult()
+        res = RTResult()  # Initialise
         number = res.register(self.visit(node.node, context))
         if res.should_return():
+            # An error has occurred
             return res
 
         error = None
 
         if node.op_tok.type == TOKEN_TYPE_MINUS:
+            # -x
             number, error = number.multed_by(Number(-1))
         elif node.op_tok.matches(TOKEN_TYPE_KEYWORD, "NOT"):
+            # NOT x
             number, error = number.notted()
 
         if error:
@@ -2986,9 +3061,18 @@ class Interpreter:
             return res.success(number.set_pos(node.pos_start, node.pos_end))
 
     def visit_IfNode(self, node, context):
-        res = RTResult()
+        """ Execute the IF/ELIF/ELSE expression/statement """
+        res = RTResult()  # Initialise
 
-        for condition, expr, should_return_null in node.cases:
+        """
+        node.cases is a list of nodes depicting IF condition THEN body
+        [[cond1, body1], [cond2, body2], ... [condN, bodyN]]
+        So, try every condition from 1 to N
+        Until a 'condition' is true
+        Then execute the corresponding body and return its value
+        """
+
+        for condition, expr, should_return_none in node.cases:
             condition_value = res.register(self.visit(condition, context))
             if res.should_return():
                 return res
@@ -2997,54 +3081,77 @@ class Interpreter:
                 expr_value = res.register(self.visit(expr, context))
                 if res.should_return():
                     return res
+
+                # Return the value - Number.none if no value
                 return res.success(
-                    Number.null if should_return_null else expr_value
+                    Number.none if should_return_none else expr_value
                 )
 
+        """
+        None of the conditions are true therefore if an ELSE expr/statement
+        is present, execute it
+        """
         if node.else_case:
-            expr, should_return_null = node.else_case
+            expr, should_return_none = node.else_case
             expr_value = res.register(self.visit(expr, context))
             if res.should_return():
                 return res
+
+            # Return the ELSE value - Number.none if no value
             return res.success(
-                Number.null if should_return_null else expr_value
+                Number.none if should_return_none else expr_value
             )
 
-        return res.success(Number.null)
+        # There is NO ELSE therefore return Number.none
+        return res.success(Number.none)
 
     def visit_ForNode(self, node, context):
-        res = RTResult()
+        """ Execute the FOR expression/statement """
+        res = RTResult()  # Initialise
         elements = []
 
+        # Determine the FOR's Start value
         start_value = res.register(self.visit(node.start_value_node, context))
         if res.should_return():
             return res
 
+        # Determine the FOR's TO/End value
         end_value = res.register(self.visit(node.end_value_node, context))
         if res.should_return():
             return res
 
         if node.step_value_node:
+            # Determine the FOR's STEP value
             step_value = res.register(
                 self.visit(node.step_value_node, context)
             )
             if res.should_return():
                 return res
         else:
+            # Default STEP value is 1
             step_value = Number(1)
 
+        # Initialise with the FOR's Start value
         i = start_value.value
 
+        # Execute the FOR loop
         while True:
             condition = (i < end_value.value if step_value.value >= 0
                          else i > end_value.value
                          )
+
+            # Continue the FOR Loop?
             if not condition:
                 break
+
+            # Yes! Update the FOR variable
             context.symbol_table.set(node.var_name_tok.value, Number(i))
             i += step_value.value
 
+            # Evaluate the FOR body
             value = res.register(self.visit(node.body_node, context))
+
+            # Should the loop be ended because of an error or a RETURN?
             if (
                 res.should_return()
                 and res.loop_should_continue is False
@@ -3052,35 +3159,44 @@ class Interpreter:
             ):
                 return res
 
+            # Has a CONTINUE Loop occurred?
             if res.loop_should_continue:
                 continue
 
+            # Has a BREAK Loop occurred?
             if res.loop_should_break:
                 break
 
+            # Append the newly evaluated FOR value
             elements.append(value)
 
         return res.success(
-            Number.null
-            if node.should_return_null
-            else List(elements)
+            Number.none
+            if node.should_return_none  # Indicates a FOR statement
+            else List(elements)  # return all the FOR values
             .set_context(context)
             .set_pos(node.pos_start, node.pos_end)
         )
 
     def visit_WhileNode(self, node, context):
-        res = RTResult()
+        """ Execute the WHILE expression/statement """
+        res = RTResult()  # Initialise
         elements = []
 
+        # Execute the WHILE loop
         while True:
             condition = res.register(self.visit(node.condition_node, context))
             if res.should_return():
                 return res
 
+            # Continue the WHILE Loop?
             if not condition.is_true():
                 break
 
+            # Evaluate the WHILE body
             value = res.register(self.visit(node.body_node, context))
+
+            # Should the loop be ended because of an error or a RETURN?
             if (
                 res.should_return()
                 and res.loop_should_continue is False
@@ -3088,25 +3204,30 @@ class Interpreter:
             ):
                 return res
 
+            # Has a CONTINUE Loop occurred?
             if res.loop_should_continue:
                 continue
 
+            # Has a BREAK Loop occurred?
             if res.loop_should_break:
                 break
 
+            # Append the newly evaluated WHILE value
             elements.append(value)
 
         return res.success(
-            Number.null
-            if node.should_return_null
-            else List(elements)
+            Number.none
+            if node.should_return_none  # Indicates a WHILE statement
+            else List(elements)  # return all the WHILE values
             .set_context(context)
             .set_pos(node.pos_start, node.pos_end)
         )
 
     def visit_FuncDefNode(self, node, context):
-        res = RTResult()
+        """ Execute the FUN expression/statement """
+        res = RTResult()  # Initialise
 
+        # Determine 'func_name' depending on whether the function is anonymous
         func_name = node.var_name_tok.value if node.var_name_tok else None
         body_node = node.body_node
         arg_names = [arg_name.value for arg_name in node.arg_name_toks]
@@ -3122,9 +3243,11 @@ class Interpreter:
         return res.success(func_value)
 
     def visit_CallNode(self, node, context):
-        res = RTResult()
+        """ Execute a Call of a FUNction """
+        res = RTResult()  # Initialise
         args = []
 
+        # Determine the Function Name
         value_to_call = res.register(self.visit(node.node_to_call, context))
         if res.should_return():
             return res
@@ -3132,37 +3255,61 @@ class Interpreter:
             node.pos_start, node.pos_end
         )
 
+        # Determine the arguments of the function
         for arg_node in node.arg_nodes:
             args.append(res.register(self.visit(arg_node, context)))
             if res.should_return():
                 return res
 
+        # Execute the Function Call
         return_value = res.register(value_to_call.execute(args))
         if res.should_return():
             return res
+
+        # Determine the return value
         return_value = (
             return_value.copy()
             .set_pos(node.pos_start, node.pos_end)
             .set_context(context)
         )
+
+        # Return the Function's return value
         return res.success(return_value)
 
     def visit_ReturnNode(self, node, context):
-        res = RTResult()
+        """
+        Execute the RETURN expression
+        If RETURN is followed by an expression
+        Evaluate this expression and return its value
+
+        If no expression, return Number.none
+
+        This also ensures that a RETURN from a Multiline Function
+        returns 'Number.none'
+        """
+        res = RTResult()  # Initialise
 
         if node.node_to_return:
+            # RETURN expression
             value = res.register(self.visit(node.node_to_return, context))
             if res.should_return():
+                # Return the evaluated expression
+                # This also handles any errors occurring
                 return res
         else:
-            value = Number.null
+            # RETURN followed by no expression
+            # Therefore represent that no value was returned
+            value = Number.none
 
+        # Return the determined return value
         return res.success_return(value)
 
     def visit_ContinueNode(self, node, context):
+        """ Execute the CONTINUE """
         return RTResult().success_continue()
 
     def visit_BreakNode(self, node, context):
+        """ Execute the BREAK """
         return RTResult().success_break()
 
     """ Allows imports of scripts whilst executing the main script """
@@ -3198,15 +3345,16 @@ class Interpreter:
         if res.error:
             return res
 
-        return res.success(Number.null)
+        return res.success(Number.none)
 
 #######################################
 # RUN
 #######################################
 
 
+# Set up all the BuiltIn constants and functions
 global_symbol_table = SymbolTable()
-global_symbol_table.set("NULL", Number.null)
+global_symbol_table.set("NONE", Number.none)
 global_symbol_table.set("FALSE", Number.false)
 global_symbol_table.set("TRUE", Number.true)
 global_symbol_table.set("MATH_PI", Number.math_PI)
