@@ -787,7 +787,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    "Token cannot appear after previous tokens",
+                    c.ERRORS["tokens_out_of_place"],
                 )
             )
         return res
@@ -915,7 +915,7 @@ class Parser:
             if not self.current_tok.type == TOKEN_TYPE_STRING:
                 return res.failure(InvalidSyntaxError(
                     self.current_tok.pos_start, self.current_tok.pos_end,
-                    "Expected string"
+                    c.ERRORS["string_expected"],
                 ))
 
             string = res.register(self.atom())
@@ -931,9 +931,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    ("Expected 'RETURN', 'CONTINUE', 'BREAK', 'VAR', 'IF', "
-                     "'FOR', 'WHILE', 'FUN', int, float, identifier, "
-                     "'+', '-', '(', '[' or 'NOT'")
+                    c.ERRORS["statement_syntax_error"],
                 )
             )
 
@@ -955,7 +953,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        "Expected identifier",
+                        c.ERRORS["identifier_expected"],
                     )
                 )
 
@@ -970,7 +968,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        "Expected '='",
+                        c.ERRORS["equal_expected"],
                     )
                 )
 
@@ -998,8 +996,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    ("Expected 'VAR', 'IF', 'FOR', 'WHILE', 'FUN', "
-                     "int, float, identifier, '+', '-', '(', '[' or 'NOT'")
+                    c.ERRORS["expr_syntax_error"],
                 )
             )
 
@@ -1040,8 +1037,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    ("Expected int, float, identifier, '+', '-', '(', '[', "
-                     "'IF', 'FOR', 'WHILE', 'FUN' or 'NOT'")
+                    c.ERRORS["comp_syntax_error"],
                 )
             )
 
@@ -1111,9 +1107,7 @@ class Parser:
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            ("Expected ')', 'VAR', 'IF', 'FOR', 'WHILE', "
-                             "'FUN', int, float, identifier, "
-                             "'+', '-', '(', '[' or 'NOT'")
+                            c.ERRORS["arg1_syntax_error"],                    
                         )
                     )
 
@@ -1133,7 +1127,7 @@ class Parser:
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            f"Expected ',' or ')'",
+                            c.ERRORS["comma_rparen_expected"],
                         )
                     )
 
@@ -1192,7 +1186,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        "Expected ')'",
+                        c.ERRORS["rparen_expected"],
                     )
                 )
 
@@ -1240,8 +1234,7 @@ class Parser:
             InvalidSyntaxError(
                 tok.pos_start,
                 tok.pos_end,
-                ("Expected int, float, identifier, '+', '-', '(', '[', "
-                 "IF', 'FOR', 'WHILE', 'FUN'")
+                c.ERRORS["atom_syntax_error"],
             )
         )
 
@@ -1261,7 +1254,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected '['",
+                    c.ERRORS["lbracket_expected"],
                 )
             )
 
@@ -1280,9 +1273,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        ("Expected 'VAR', 'IF', 'FOR', 'WHILE', 'FUN', "
-                         "int, float, identifier, "
-                         "'+', '-', '(', '[', ']', or 'NOT'")
+                        c.ERRORS["list_element_expected"],
                     )
                 )
 
@@ -1302,7 +1293,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        f"Expected ',' or ']'",
+                        c.ERRORS["comma_rbracket_expected"],
                     )
                 )
 
@@ -1437,7 +1428,7 @@ class Parser:
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            "Expected 'END'",
+                            c.ERRORS["end_expected"],
                         )
                     )
             else:
@@ -1504,7 +1495,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected 'THEN'",
+                    c.ERRORS["then_expected"],
                 )
             )
 
@@ -1591,7 +1582,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected 'FOR'",
+                    c.ERRORS["for_expected"],
                 )
             )
 
@@ -1603,7 +1594,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected identifier",
+                    c.ERRORS["identifier_expected"],
                 )
             )
 
@@ -1616,7 +1607,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected '='",
+                    c.ERRORS["equal_expected"],
                 )
             )
 
@@ -1633,7 +1624,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected 'TO'",
+                    c.ERRORS["to_expected"],
                 )
             )
 
@@ -1662,7 +1653,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected 'THEN'",
+                    c.ERRORS["then_expected"],
                 )
             )
 
@@ -1684,7 +1675,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        f"Expected 'END'",
+                        c.ERRORS["end_expected"],
                     )
                 )
 
@@ -1736,7 +1727,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected 'WHILE'",
+                    c.ERRORS["while_expected"],
                 )
             )
 
@@ -1753,7 +1744,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected 'THEN'",
+                    c.ERRORS["then_expected"],
                 )
             )
 
@@ -1775,7 +1766,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        f"Expected 'END'",
+                        c.ERRORS["end_expected"],
                     )
                 )
 
@@ -1827,7 +1818,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected 'FUN'",
+                    c.ERRORS["fun_expected"],
                 )
             )
 
@@ -1844,7 +1835,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        f"Expected '('",
+                        c.ERRORS["lparen_expected"],
                     )
                 )
         else:
@@ -1855,7 +1846,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        f"Expected identifier or '('",
+                        c.ERRORS["identifier_lparen_expected"],
                     )
                 )
 
@@ -1879,7 +1870,7 @@ class Parser:
                         InvalidSyntaxError(
                             self.current_tok.pos_start,
                             self.current_tok.pos_end,
-                            f"Expected identifier",
+                            c.ERRORS["identifier_expected"],
                         )
                     )
 
@@ -1893,7 +1884,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        f"Expected ',' or ')'",
+                        c.ERRORS["comma_rparen_expected"],
                     )
                 )
         else:
@@ -1902,7 +1893,7 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_tok.pos_start,
                         self.current_tok.pos_end,
-                        f"Expected identifier or ')'",
+                        c.ERRORS["identifier_rparen_expected"],
                     )
                 )
 
@@ -1934,7 +1925,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected '->' or NEWLINE",
+                    c.ERRORS["arrow_NL_expected"],
                 )
             )
 
@@ -1951,7 +1942,7 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_tok.pos_start,
                     self.current_tok.pos_end,
-                    f"Expected 'END'",
+                    c.ERRORS["end_expected"],
                 )
             )
 
@@ -2187,7 +2178,7 @@ class Number(Value):
                 return None, RTError(
                     other.pos_start,
                     other.pos_end,
-                    "Division by zero",
+                    c.ERRORS["division_by_zero"],
                     self.context,
                 )
 
@@ -2205,7 +2196,7 @@ class Number(Value):
                 return None, RTError(
                     other.pos_start,
                     other.pos_end,
-                    "Modulus using zero",
+                    c.ERRORS["modulus_by_zero"],
                     self.context,
                 )
 
@@ -2411,12 +2402,10 @@ class List(Value):
                 new_list.elements.pop(other.value)
                 return new_list, None
             except IndexError:
-                errormess = ("Element at this index could not be removed from "
-                             "list because index is out of bounds")
                 return None, RTError(
                     other.pos_start,
                     other.pos_end,
-                    errormess,
+                    c.ERRORS["list_index_error"],
                     self.context,
                 )
         else:
@@ -2437,12 +2426,10 @@ class List(Value):
             try:
                 return self.elements[other.value], None
             except IndexError:
-                errormess = ("Element at this index could not be retrieved "
-                             "from list because index is out of bounds")
                 return None, RTError(
                     other.pos_start,
                     other.pos_end,
-                    errormess,
+                    c.ERRORS["fetch_index_error"],
                     self.context,
                 )
         else:
@@ -2703,7 +2690,7 @@ class BuiltInFunction(BaseFunction):
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    "First argument must be list",
+                    c.ERRORS["arg1_list_expected"],
                     execution_context,
                 )
             )
@@ -2723,7 +2710,7 @@ class BuiltInFunction(BaseFunction):
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    "First argument must be list",
+                    c.ERRORS["arg1_list_expected"],
                     execution_context,
                 )
             )
@@ -2733,7 +2720,7 @@ class BuiltInFunction(BaseFunction):
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    "Second argument must be number",
+                    c.ERRORS["arg2_number_expected"],
                     execution_context,
                 )
             )
@@ -2741,13 +2728,11 @@ class BuiltInFunction(BaseFunction):
         try:
             element = list_.elements.pop(index.value)
         except IndexError:
-            errormess = ("Element at this index could not be removed from "
-                         "list because index is out of bounds")
             return RTResult().failure(
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    errormess,
+                    c.ERRORS["list_index_error"],
                     execution_context,
                 )
             )
@@ -2765,7 +2750,7 @@ class BuiltInFunction(BaseFunction):
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    "First argument must be list",
+                    c.ERRORS["arg1_list_expected"],
                     execution_context,
                 )
             )
@@ -2775,7 +2760,7 @@ class BuiltInFunction(BaseFunction):
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    "Second argument must be list",
+                    c.ERRORS["arg2_list_expected"],                    
                     execution_context,
                 )
             )
@@ -2794,7 +2779,7 @@ class BuiltInFunction(BaseFunction):
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    "Argument must be list",
+                    c.ERRORS["arg_list_expected"],
                     execution_context,
                 )
             )
@@ -2815,7 +2800,7 @@ class BuiltInFunction(BaseFunction):
                 RTError(
                     self.pos_start,
                     self.pos_end,
-                    "Second argument must be string",
+                    c.ERRORS["arg2_string_expected"],
                     execution_context,
                 )
             )
