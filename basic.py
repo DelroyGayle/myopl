@@ -1756,51 +1756,33 @@ class Parser:
             result.register_advancement()  # Advance past ELSE
             self.advance()
 
-            # Multiline ELSE begin with a newline \n or ;
             if self.current_tok.type == TOKEN_TYPE_NEWLINE:
                 # ELSE followed by a NL indicates a Multiline ELSE
-                result.register_advancement()  # Advance past the NL
-                self.advance()
-
-                # Parse the ELSE's Multiline statements
-                statements = result.register(
-                    self.statements(in_a_function, in_a_loop)
-                )
-                if result.error:
-                    return result
-
-                """
-                'True' indicates that 'should_return_none' is set to True
-                Because ELSE statement(s) do not return a value
-                """
-                else_case = (statements, True)
-
-                if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
-                    result.register_advancement()  # Advance past END
-                    self.advance()
+                else_case, error = self.parse_multiline_else(in_a_function,
+                                                             in_a_loop,
+                                                             result)
+                if error:
+                    return error
                 else:
-                    return result.failure(
-                        InvalidSyntaxError(
-                            self.current_tok.pos_start,
-                            self.current_tok.pos_end,
-                            c.ERRORS["end_expected"],
-                        )
-                    )
-            else:
-                # This is an ELSE expression - Parse it
-                expr = result.register(
-                    self.statement(in_a_function, in_a_loop)
-                )
-                if result.error:
-                    return result
+                    # Successful ELSE parse
+                    return result.success(else_case)
 
-                """
-                'False' indicates that 'should_return_none' is set to False
-                Because an ELSE expression does return a value
-                """
-                else_case = (expr, False)
+            # This is an ELSE expression - Parse it
+            expr = result.register(
+                self.statement(in_a_function, in_a_loop)
+            )
+            if result.error:
+                return result
 
-        # Successful ELSE parse
+            """
+            Successful parse
+            'False' indicates that 'should_return_none' is set to False
+            Because an ELSE expression does return a value
+            """
+            else_case = (expr, False)
+
+        # This will have the value None
+        # if there is no ELSE statement/expression
         return result.success(else_case)
 
     def if_expr_b_or_c(self, in_a_function, in_a_loop):
@@ -1865,56 +1847,116 @@ class Parser:
 
         # Multiline statements begin with a newline \n or ;
         if self.current_tok.type == TOKEN_TYPE_NEWLINE:
-            result.register_advancement()  # Advance past the NL
-            self.advance()
-
-            # Parse the Multiline statements
-            statements = result.register(
-                self.statements(in_a_function, in_a_loop)
+            # THEN followed by a NL indicates Multiline IF/ELIF
+            cases, else_case, error = (
+                       self.parse_multiline_then(in_a_function,
+                                                 in_a_loop,
+                                                 condition,
+                                                 result)
             )
-            if result.error:
-                return result
-
-            """
-            'True' indicates that 'should_return_none' is set to True
-            Because IF statement(s) do not return a value
-            """
-            cases.append((condition, statements, True))
-
-            if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
-                result.register_advancement()  # Advance past END
-                self.advance()
+            if error:
+                return error
             else:
-                # Handle ELIF and ELSE statements
-                all_cases = result.register(
-                    self.if_expr_b_or_c(in_a_function, in_a_loop)
-                )
-                if result.error:
-                    return result
-                new_cases, else_case = all_cases
-                cases.extend(new_cases)
+                # Successful THEN parse
+                return result.success((cases, else_case))
+
+        # This is a single IF expression - Parse it
+        expr = result.register(self.statement(in_a_function, in_a_loop))
+        if result.error:
+            return result
+
+        """
+        'False' indicates that 'should_return_none' is set to False
+        Because an IF expression does return a value
+        """
+        cases.append((condition, expr, False))
+
+        all_cases = result.register(
+            self.if_expr_b_or_c(in_a_function, in_a_loop)
+        )
+        if result.error:
+            return result
+
+        new_cases, else_case = all_cases
+        cases.extend(new_cases)
+
+        # Successful Parse
+        return result.success((cases, else_case))
+
+    def parse_multiline_else(self, in_a_function, in_a_loop, result):
+        """Parse ELSE Multiline statements"""
+
+        result.register_advancement()  # Advance past the NL
+        self.advance()
+
+        # Parse the statements
+        statements = result.register(
+            self.statements(in_a_function, in_a_loop)
+        )
+        if result.error:
+            return result
+
+        """
+        'True' indicates that 'should_return_none' is set to True
+        Because ELSE statement(s) do not return a value
+        """
+        else_case = (statements, True)
+
+        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
+            result.register_advancement()  # Advance past END
+            self.advance()
         else:
-            # This is a single IF expression - Parse it
-            expr = result.register(self.statement(in_a_function, in_a_loop))
-            if result.error:
-                return result
+            return (None,
+                    result.failure(
+                                    InvalidSyntaxError(
+                                        self.current_tok.pos_start,
+                                        self.current_tok.pos_end,
+                                        c.ERRORS["end_expected"],
+                                    )
+                                )
+                    )
 
-            """
-            'False' indicates that 'should_return_none' is set to False
-            Because an IF expression does return a value
-            """
-            cases.append((condition, expr, False))
+        # Successful Parse
+        return else_case, None
 
+    def parse_multiline_then(self, in_a_function, in_a_loop,
+                             condition, result):
+        """Parse THEN Multiline statements"""
+
+        cases = []
+        else_case = None
+        result.register_advancement()  # Advance past the NL
+        self.advance()
+
+        # Parse the statements
+        statements = result.register(
+            self.statements(in_a_function, in_a_loop)
+        )
+        if result.error:
+            return None, None, result
+
+        """
+        'True' indicates that 'should_return_none' is set to True
+        Because IF statement(s) do not return a value
+        """
+        cases.append((condition, statements, True))
+
+        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
+            result.register_advancement()  # Advance past END
+            self.advance()
+        else:
+            # Handle ELIF and ELSE statements
             all_cases = result.register(
                 self.if_expr_b_or_c(in_a_function, in_a_loop)
             )
             if result.error:
-                return result
+                return None, None, result
+
             new_cases, else_case = all_cases
             cases.extend(new_cases)
 
         # Successful Parse
-        return result.success((cases, else_case))
+        return cases, else_case, None
 
     def for_expr(self, in_a_function, in_a_loop):
         """
