@@ -398,13 +398,11 @@ class Lexer:
         # Advance past the opening quote
         self.advance()
 
-        escape_characters = {"n": "\n", "t": "\t"}
-
         while self.current_char is not None and (
             self.current_char != '"' or escape_character_flag
         ):
             if escape_character_flag:
-                string += escape_characters.get(
+                string += c.ESCAPE_CHARACTERS.get(
                     self.current_char, self.current_char
                 )
                 escape_character_flag = False

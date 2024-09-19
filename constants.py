@@ -10,6 +10,16 @@ LETTERS_DIGITS = LETTERS + DIGITS
 NUMBER_CHARS = DIGITS + ".eE"
 ERR = {}
 
+# Also will handle \xhh - Hex values
+ESCAPE_CHARACTERS = {"n": "\n",  # New Line
+                     "t": "\t",  # Tab
+                     '"': '"',   # Double Quote
+                     "\\": "\\", # Backslash
+                     "r": "\r",  # Carriage Return
+                     "b": "\b",  # Backspace
+                     "f": "\f",  # Form Feed
+                     }
+
 #######################################
 # ERRORS
 #######################################
