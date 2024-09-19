@@ -362,7 +362,7 @@ class Lexer:
             self.advance()  # advance past the digit or '.'
 
         try:
-            thenumber = (int(num_str) if dot_count == 0 
+            thenumber = (int(num_str) if dot_count == 0
                          else float(num_str))
             # Check whether the comverted number is too big
             if (math.isinf(thenumber) or math.log10(thenumber)) >= 308:
@@ -372,16 +372,16 @@ class Lexer:
             if dot_count == 0:
                 # integer
                 return Token(TOKEN_TYPE_INT,
-                            thenumber,
-                            pos_start,
-                            self.pos), None
+                             thenumber,
+                             pos_start,
+                             self.pos), None
             else:
                 # float/decimal number
                 return Token(TOKEN_TYPE_FLOAT,
-                            thenumber,
-                            pos_start,
-                            self.pos), None
-            
+                             thenumber,
+                             pos_start,
+                             self.pos), None
+
         except (OverflowError, MemoryError):
             return (None, InvalidSyntaxError(pos_start, self.pos,
                     c.ERRORS["number_overflow"]))
@@ -394,31 +394,29 @@ class Lexer:
     def make_string(self):
         string = ""
         pos_start = self.pos.copy()
-        escape_character = False
-        # Advance past opening quote
+        escape_character_flag = False
+        # Advance past the opening quote
         self.advance()
 
         escape_characters = {"n": "\n", "t": "\t"}
 
         while self.current_char is not None and (
-            self.current_char != '"' or escape_character
+            self.current_char != '"' or escape_character_flag
         ):
-            if escape_character:
+            if escape_character_flag:
                 string += escape_characters.get(
                     self.current_char, self.current_char
                 )
+                escape_character_flag = False
             else:
                 if self.current_char == "\\":
-                    escape_character = True
+                    escape_character_flag = True
                 else:
                     string += self.current_char
             self.advance()
-            escape_character = False
 
         if self.current_char is None:
             # Unterminated string
-            pos_start = self.pos.copy()
-
             return (None, InvalidSyntaxError(pos_start, self.pos,
                     c.ERRORS["unterminated_string"]))
 
