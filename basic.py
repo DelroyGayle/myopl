@@ -145,6 +145,15 @@ TOKEN_TYPE_ARROW = "ARROW"
 TOKEN_TYPE_NEWLINE = "NEWLINE"
 TOKEN_TYPE_EOF = "EOF"
 
+COMPARISONS_TOKEN = (
+                    TOKEN_TYPE_EQUAL_TO,
+                    TOKEN_TYPE_NOT_EQUAL_TO,
+                    TOKEN_TYPE_LESS_THAN,
+                    TOKEN_TYPE_GREATER_THAN,
+                    TOKEN_TYPE_LESS_THAN_EQUAL_TO,
+                    TOKEN_TYPE_GREATER_THAN_EQUAL_TO,
+                )
+
 KEYWORDS = [
     "VAR",
     "AND",
@@ -982,6 +991,7 @@ class Parser:
         Begin with
             in_a_function=False, in_a_loop=False
         """
+
         result = self.statements(False, False)
         if not result.error and self.current_tok.type != TOKEN_TYPE_EOF:
             """
@@ -1002,6 +1012,7 @@ class Parser:
 
     def statements(self, in_a_function, in_a_loop):
         """Parse a list of statements. Minimum: One Statement"""
+
         result = ParseResult()  # Initialise
         statements = []
         # Record the beginning of the First Statement
@@ -1034,6 +1045,7 @@ class Parser:
 
     def statement(self, in_a_function, in_a_loop):
         """Parse a single statement"""
+
         result = ParseResult()  # Initialise
         # Record the beginning of the Statement
         pos_start = self.current_tok.pos_start.copy()
@@ -1074,6 +1086,7 @@ class Parser:
                                         statements,
                                         result):
         """ Check for any further optional statements and parse them """
+
         more_statements = True
 
         while True:
@@ -1224,6 +1237,7 @@ class Parser:
 
     def expr(self, in_a_function, in_a_loop):
         """Parse a Single Expression"""
+
         result = ParseResult()  # Initialise
 
         if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "VAR"):
@@ -1299,6 +1313,7 @@ class Parser:
 
     def comp_expr(self, in_a_function, in_a_loop):
         """Parse a Comparison Expression"""
+
         result = ParseResult()  # Initialise
 
         if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "NOT"):
@@ -1320,14 +1335,7 @@ class Parser:
                 in_a_function,
                 in_a_loop,
                 self.arith_expr,
-                (
-                    TOKEN_TYPE_EQUAL_TO,
-                    TOKEN_TYPE_NOT_EQUAL_TO,
-                    TOKEN_TYPE_LESS_THAN,
-                    TOKEN_TYPE_GREATER_THAN,
-                    TOKEN_TYPE_LESS_THAN_EQUAL_TO,
-                    TOKEN_TYPE_GREATER_THAN_EQUAL_TO,
-                ),
+                COMPARISONS_TOKEN,
             )
         )
 
@@ -1398,56 +1406,72 @@ class Parser:
         if result.error:
             return result
 
-        if self.current_tok.type == TOKEN_TYPE_LPAREN:
-            result.register_advancement()  # Advance past the Left Parenthesis
-            self.advance()
-            # List of argument nodes which can be empty i.e. []
-            arg_nodes = []
+        if self.current_tok.type != TOKEN_TYPE_LPAREN:
+            """
+            This is NOT a Function Call
+            An 'atom' can be either a number, a string,
+            a variable, a parenthesised expression (expr), a list,
+            IF expression, FOR expression, WHILE expression or
+            a FUN definition
+            atom() will be called at this point to parse it
+            """
+            return result.success(atom)
 
-            if self.current_tok.type == TOKEN_TYPE_RPAREN:
-                # Advance past the Right Parenthesis
-                # This is a Function Call without arguments i.e. func()
-                result.register_advancement()
+        """
+        Otherwise parse a Function Call
+        which would bb either of these two forms:
+        function()
+        function(arg1, ...)
+        """
+
+        result.register_advancement()  # Advance past the Left Parenthesis
+        self.advance()
+        # List of argument nodes which can be empty i.e. []
+        arg_nodes = []
+
+        if self.current_tok.type == TOKEN_TYPE_RPAREN:
+            # Advance past the Right Parenthesis
+            # This is a Function Call without arguments i.e. func()
+            result.register_advancement()
+            self.advance()
+        else:
+            # Parse the first argument
+            the_arg = self.expr(in_a_function, in_a_loop)
+            arg_nodes.append(result.register(the_arg))
+            if result.error:
+                return result.failure(
+                    InvalidSyntaxError(
+                        self.current_tok.pos_start,
+                        self.current_tok.pos_end,
+                        c.ERRORS["arg1_syntax_error"],
+                    )
+                )
+
+            # Optionally more arguments could follow preceded by a comma
+            while self.current_tok.type == TOKEN_TYPE_COMMA:
+                result.register_advancement()  # Advance past ,
                 self.advance()
-            else:
-                # Parse the first argument
+
+                # Parse an argument
                 the_arg = self.expr(in_a_function, in_a_loop)
                 arg_nodes.append(result.register(the_arg))
                 if result.error:
-                    return result.failure(
-                        InvalidSyntaxError(
-                            self.current_tok.pos_start,
-                            self.current_tok.pos_end,
-                            c.ERRORS["arg1_syntax_error"],
-                        )
+                    return result
+
+            # if no comma, then the closing right parenthesis must follow
+            if self.current_tok.type != TOKEN_TYPE_RPAREN:
+                return result.failure(
+                    InvalidSyntaxError(
+                        self.current_tok.pos_start,
+                        self.current_tok.pos_end,
+                        c.ERRORS["comma_rparen_expected"],
                     )
+                )
 
-                # Optionally more arguments could follow preceded by a comma
-                while self.current_tok.type == TOKEN_TYPE_COMMA:
-                    result.register_advancement()  # Advance past ,
-                    self.advance()
-
-                    # Parse an argument
-                    the_arg = self.expr(in_a_function, in_a_loop)
-                    arg_nodes.append(result.register(the_arg))
-                    if result.error:
-                        return result
-
-                # if no comma, then the closing right parenthesis must follow
-                if self.current_tok.type != TOKEN_TYPE_RPAREN:
-                    return result.failure(
-                        InvalidSyntaxError(
-                            self.current_tok.pos_start,
-                            self.current_tok.pos_end,
-                            c.ERRORS["comma_rparen_expected"],
-                        )
-                    )
-
-                # Advance past the Right Parenthesis
-                result.register_advancement()
-                self.advance()
-            return result.success(CallNode(atom, arg_nodes))
-        return result.success(atom)
+            # Advance past the Right Parenthesis
+            result.register_advancement()
+            self.advance()
+        return result.success(CallNode(atom, arg_nodes))
 
     def atom(self, in_a_function, in_a_loop):
         """
@@ -1582,45 +1606,51 @@ class Parser:
             # This is an empty list []
             result.register_advancement()  # Advance past the Right Bracket
             self.advance()
-        else:
-            # Parse the first EXPR
-            expression = result.register(self.expr(in_a_function, in_a_loop))
+            # Parsed an empty list i.e. []
+            return result.success(
+                                    ListNode(element_nodes, pos_start,
+                                             self.current_tok.pos_end.copy())
+            )
+
+        # Parse a nonempty list [elem1, ...]
+        # Parse the first EXPR
+        expression = result.register(self.expr(in_a_function, in_a_loop))
+        element_nodes.append(expression)
+        if result.error:
+            return result.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    c.ERRORS["list_element_expected"],
+                )
+            )
+
+        # Optionally more EXPRs could follow preceded by a comma
+        while self.current_tok.type == TOKEN_TYPE_COMMA:
+            result.register_advancement()  # Advance past ,
+            self.advance()
+
+            # Parse an Expression
+            expression = result.register(
+                self.expr(in_a_function, in_a_loop)
+            )
             element_nodes.append(expression)
             if result.error:
-                return result.failure(
-                    InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
-                        c.ERRORS["list_element_expected"],
-                    )
+                return result
+
+        # Parse Closing Bracket
+        if self.current_tok.type != TOKEN_TYPE_RSQUARE:
+            return result.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    c.ERRORS["comma_rbracket_expected"],
                 )
+            )
 
-            # Optionally more EXPRs could follow preceded by a comma
-            while self.current_tok.type == TOKEN_TYPE_COMMA:
-                result.register_advancement()  # Advance past ,
-                self.advance()
-
-                # Parse an Expression
-                expression = result.register(
-                    self.expr(in_a_function, in_a_loop)
-                )
-                element_nodes.append(expression)
-                if result.error:
-                    return result
-
-            # Parse Closing Bracket
-            if self.current_tok.type != TOKEN_TYPE_RSQUARE:
-                return result.failure(
-                    InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
-                        c.ERRORS["comma_rbracket_expected"],
-                    )
-                )
-
-            # Advance past the Closing Right Bracket
-            result.register_advancement()
-            self.advance()
+        # Advance past the Closing Right Bracket
+        result.register_advancement()
+        self.advance()
 
         # Successful Parse
         return result.success(
