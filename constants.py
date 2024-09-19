@@ -8,7 +8,7 @@ DIGITS = "0123456789"
 LETTERS = string.ascii_letters
 LETTERS_DIGITS = LETTERS + DIGITS
 NUMBER_CHARS = DIGITS + ".eE"
-ERR = {}
+HEX_CHARS = 'ABCDEFabcdef' + DIGITS
 
 # Also will handle \xhh - Hex values
 ESCAPE_CHARACTERS = {"n": "\n",  # New Line
@@ -71,6 +71,8 @@ ERRORS = {
   "exponent_error": "Floating point number in exponential notation expected",
   "number_overflow": "Number too large",
   "number_conversion_error": "Could not convert this to a number",
+  "illegal_hex_char": ("Two Hex characters expected \\xhh, "
+                       "h either 0-9 A-F a-f"),
   # RUNTIME ERRORS
   "division_by_zero": "Division by zero",
   "modulus_by_zero": "Modulus using zero",

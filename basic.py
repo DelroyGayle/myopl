@@ -399,8 +399,17 @@ class Lexer:
         self.advance()
 
         while self.current_char is not None and (
-            self.current_char != '"' or escape_character_flag
-        ):
+              self.current_char != '"' or escape_character_flag):
+
+            if escape_character_flag and self.current_char == 'x':
+                escape_character_flag = False
+                self.advance()
+                result, error = self.handle_hex_value(pos_start)
+                if error:
+                    return None, error
+                string += result
+                continue
+
             if escape_character_flag:
                 string += c.ESCAPE_CHARACTERS.get(
                     self.current_char, self.current_char
@@ -421,6 +430,40 @@ class Lexer:
         # Advance past the closing quote "
         self.advance()
         return Token(TOKEN_TYPE_STRING, string, pos_start, self.pos), None
+
+    def handle_hex_value(self, pos_start):
+        """
+        Process escaped hex values
+        Note: there must be TWO hexadecimal characters
+        """
+        # The hex value must be of the form \xhh
+        char1, error = self.check_the_char(pos_start)
+        if error:
+            return char1, error
+        # Advance past the first hex character
+        self.advance()
+
+        char2, error = self.check_the_char(pos_start)
+        if error:
+            return char2, error
+        # Advance past the second hex character
+        self.advance()
+
+        return chr(int(char1, 16) * 16 + int(char2, 16)), None
+
+    def check_the_char(self, pos_start):
+        if self.current_char is None:
+            # Unterminated string
+            return (None, InvalidSyntaxError(pos_start, self.pos,
+                    c.ERRORS["unterminated_string"]))
+
+        if self.current_char not in c.HEX_CHARS:
+            # Illegal hex character
+            self.advance()
+            return (None, InvalidSyntaxError(pos_start, self.pos,
+                    c.ERRORS["illegal_hex_char"]))
+
+        return self.current_char, None
 
     def make_identifier(self):
         id_str = ""
