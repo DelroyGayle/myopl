@@ -20,6 +20,7 @@ class Error:
         self.details = details
 
     def as_string(self):
+        """ Traceback Result """
         result = f"{self.error_name}: {self.details}\n\n"
         result += (f"File {self.pos_start.filename}, "
                    f"line {self.pos_start.linenum + 1}")
@@ -92,6 +93,7 @@ class Position:
         self.filetext = filetext
 
     def advance(self, current_char=None):
+        """ Advance the position by 1 """
         self.theindex += 1
         self.column += 1
 
@@ -173,6 +175,7 @@ class Token:
             self.pos_end = pos_end.copy()
 
     def matches(self, token_type, value):
+        """ Does the token match the value? """
         return self.type == token_type and self.value == value
 
     def __repr__(self):
@@ -340,6 +343,7 @@ class Lexer:
                     c.ERRORS["exponent_error"]))
 
     def make_number(self):
+        """ Parse a Number """
         num_str = ""
         dot_count = 0
         pos_start = self.pos.copy()
@@ -395,6 +399,7 @@ class Lexer:
                     c.ERRORS["number_conversion_error"]))
 
     def make_string(self):
+        """ Parse a String """
         string = ""
         pos_start = self.pos.copy()
         escape_character_flag = False
@@ -469,6 +474,7 @@ class Lexer:
         return self.current_char, None
 
     def make_identifier(self):
+        """ Parse an Identifier """
         id_str = ""
         pos_start = self.pos.copy()
 
@@ -484,7 +490,7 @@ class Lexer:
         return Token(tok_type, id_str, pos_start, self.pos)
 
     def make_minus_or_arrow(self):
-        # ->
+        """ Parse -> """
         tok_type = TOKEN_TYPE_MINUS
         pos_start = self.pos.copy()
         self.advance()
@@ -496,6 +502,7 @@ class Lexer:
         return Token(tok_type, pos_start=pos_start, pos_end=self.pos)
 
     def make_not_equals(self):
+        """ Parse != """
         pos_start = self.pos.copy()
         self.advance()
 
@@ -509,6 +516,7 @@ class Lexer:
         return None, ExpectedCharError(pos_start, self.pos, "'=' (after '!')")
 
     def make_equals(self):
+        """ Parse = or == """
         tok_type = TOKEN_TYPE_ASSIGN
         pos_start = self.pos.copy()
         self.advance()
@@ -522,6 +530,7 @@ class Lexer:
         return Token(tok_type, pos_start=pos_start, pos_end=self.pos)
 
     def make_less_than(self):
+        """ Parse < or <= """
         tok_type = TOKEN_TYPE_LESS_THAN
         pos_start = self.pos.copy()
         self.advance()
@@ -535,6 +544,7 @@ class Lexer:
         return Token(tok_type, pos_start=pos_start, pos_end=self.pos)
 
     def make_greater_than(self):
+        """ Parse > or >= """
         tok_type = TOKEN_TYPE_GREATER_THAN
         pos_start = self.pos.copy()
         self.advance()
@@ -648,9 +658,9 @@ class VarAssignNode:
 
 
 class BinOpNode:
-    def __init__(self, left_node, op_tok, right_node):
+    def __init__(self, left_node, operator_token, right_node):
         self.left_node = left_node
-        self.op_tok = op_tok
+        self.operator_token = operator_token
         self.right_node = right_node
 
         # Record the beginning of the Left Expression
@@ -659,20 +669,20 @@ class BinOpNode:
         self.pos_end = self.right_node.pos_end
 
     def __repr__(self):
-        return f"({self.left_node}, {self.op_tok}, {self.right_node})"
+        return f"({self.left_node}, {self.operator_token}, {self.right_node})"
 
 
 class UnaryOpNode:
-    def __init__(self, op_tok, node):
-        self.op_tok = op_tok
+    def __init__(self, operator_token, node):
+        self.operator_token = operator_token
         self.node = node
 
-        self.pos_start = self.op_tok.pos_start
+        self.pos_start = self.operator_token.pos_start
         # Record the end of the Unary Expression
         self.pos_end = node.pos_end
 
     def __repr__(self):
-        return f"({self.op_tok}, {self.node})"
+        return f"({self.operator_token}, {self.node})"
 
 
 class IfNode:
@@ -684,7 +694,7 @@ class IfNode:
         # Record the beginning of the very first IF Conditional Expression
         self.pos_start = self.cases[0][0].pos_start
 
-        # Record either the end of an ELSE expression OR
+        # Either Record the end of an ELSE expression OR
         self.pos_end = (
             (self.else_case or
              # Record the end of the very last IF Conditional Expression
@@ -744,10 +754,10 @@ class FuncDefNode:
             self.pos_start = self.arg_name_toks[0].pos_start
         else:
             # Anonymous FUN, No Args! Body only!
-            # Record the beginning of body of the FUN expression
+            # Record the beginning of the body of the FUN expression
             self.pos_start = self.body_node.pos_start
 
-        # Record the end of the body of the FUN Expression
+        # Record the end of the body of the FUN expression
         self.pos_end = self.body_node.pos_end
 
 
@@ -841,7 +851,7 @@ class ParseResult:
         if res.error:
             """
             An error has occurred therefore
-            note the number of tokens needed to go
+            record the number of tokens needed to go
             back to the previous token position
             before the error occurred
             Hence, 'to_reverse_count'
@@ -849,7 +859,7 @@ class ParseResult:
             self.to_reverse_count = res.advance_count
             return None
 
-        # No error occurred
+        # No error occurred - proceed forward
         return self.register(res)
 
     def success(self, node):
@@ -860,7 +870,7 @@ class ParseResult:
     def failure(self, error):
         """
         An error has occurred
-        If no error has been registered at this point,
+        If no error has been previously registered then
         Register the error now i.e.
         'self.error = error'
         """
@@ -883,6 +893,7 @@ class Parser:
         self.advance()
 
     def advance(self):
+        """ Advance by One Token """
         self.token_index += 1
         self.update_current_tok()
         # Return new token
@@ -901,11 +912,16 @@ class Parser:
         return self.current_tok
 
     def update_current_tok(self):
-        # Fetch Next Token
+        """ Fetch Next Token """
         if self.token_index >= 0 and self.token_index < len(self.tokens):
             self.current_tok = self.tokens[self.token_index]
 
     def parse(self):
+        """
+        Commence the Parsing of all the tokens produced by the Lexer
+        Begin with 
+            in_a_function=False, in_a_loop=False
+        """
         res = self.statements(False, False)
         if not res.error and self.current_tok.type != TOKEN_TYPE_EOF:
             """
@@ -925,13 +941,13 @@ class Parser:
     ###################################
 
     def statements(self, in_a_function, in_a_loop):
-        # Parse a list of statements. Minimum: One Statement
+        """ Parse a list of statements. Minimum: One Statement """
         res = ParseResult()  # Initialise
         statements = []
         # Record the beginning of the First Statement
         pos_start = self.current_tok.pos_start.copy()
 
-        # Multiline statements begin with a newline \n or ;
+        # To begin with, advance past any newlines \n or ;
         while self.current_tok.type == TOKEN_TYPE_NEWLINE:
             res.register_advancement()  # Advance past the NL
             self.advance()
@@ -944,7 +960,7 @@ class Parser:
             # Error occurred with the very first statement!
             return res
 
-        # Successful statement parse
+        # Successful parsed statement
         statements.append(statement)
 
         # Check for any further optional statements
@@ -953,10 +969,10 @@ class Parser:
         while True:
             newline_count = 0
             while self.current_tok.type == TOKEN_TYPE_NEWLINE:
-                # Advance past any newlines \n or ;
+                # To begin with, advance past any newlines \n or ;
                 res.register_advancement()  # Advance past the NL
                 self.advance()
-                newline_count += 1  # Count each newline ;
+                newline_count += 1  # Count each newline or ;
             if newline_count == 0:
                 # Since the count is zero,
                 # there are definitely no further statements
@@ -992,7 +1008,7 @@ class Parser:
 
                 continue
 
-            # Successful statement parse
+            # Successful parsed statement
             statements.append(statement)
 
         # Return a list of parsed statement nodes
@@ -1174,7 +1190,7 @@ class Parser:
 
         if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "NOT"):
             # Parse NOT EXPR
-            op_tok = self.current_tok
+            operator_token = self.current_tok
             res.register_advancement()  # Advance past NOT
             self.advance()
 
@@ -1186,7 +1202,7 @@ class Parser:
                 return res
 
             # Successful Parse
-            return res.success(UnaryOpNode(op_tok, node))
+            return res.success(UnaryOpNode(operator_token, node))
 
         node = res.register(
             self.bin_op(
@@ -2184,13 +2200,13 @@ class Parser:
             self.current_tok.type in ops
             or (self.current_tok.type, self.current_tok.value) in ops
         ):
-            op_tok = self.current_tok
+            operator_token = self.current_tok
             res.register_advancement()  # Advance past the Operator Token
             self.advance()
             right = res.register(func_b(in_a_function, in_a_loop))
             if res.error:
                 return res
-            left = BinOpNode(left, op_tok, right)
+            left = BinOpNode(left, operator_token, right)
 
         return res.success(left)
 
@@ -3190,33 +3206,33 @@ class Interpreter:
             # An error has occurred
             return res
 
-        if node.op_tok.type == TOKEN_TYPE_PLUS:
+        if node.operator_token.type == TOKEN_TYPE_PLUS:
             result, error = left.added_to(right)
-        elif node.op_tok.type == TOKEN_TYPE_MINUS:
+        elif node.operator_token.type == TOKEN_TYPE_MINUS:
             result, error = left.subtracted_by(right)
-        elif node.op_tok.type == TOKEN_TYPE_MULTIPLY:
+        elif node.operator_token.type == TOKEN_TYPE_MULTIPLY:
             result, error = left.multiplied_by(right)
-        elif node.op_tok.type == TOKEN_TYPE_DIVIDE:
+        elif node.operator_token.type == TOKEN_TYPE_DIVIDE:
             result, error = left.divided_by(right)
-        elif node.op_tok.type == TOKEN_TYPE_MODULUS:
+        elif node.operator_token.type == TOKEN_TYPE_MODULUS:
             result, error = left.modulused_by(right)
-        elif node.op_tok.type == TOKEN_TYPE_POWER:
+        elif node.operator_token.type == TOKEN_TYPE_POWER:
             result, error = left.powered_by(right)
-        elif node.op_tok.type == TOKEN_TYPE_EQUAL_TO:
+        elif node.operator_token.type == TOKEN_TYPE_EQUAL_TO:
             result, error = left.get_comparison_eq(right)
-        elif node.op_tok.type == TOKEN_TYPE_NOT_EQUAL_TO:
+        elif node.operator_token.type == TOKEN_TYPE_NOT_EQUAL_TO:
             result, error = left.get_comparison_ne(right)
-        elif node.op_tok.type == TOKEN_TYPE_LESS_THAN:
+        elif node.operator_token.type == TOKEN_TYPE_LESS_THAN:
             result, error = left.get_comparison_lt(right)
-        elif node.op_tok.type == TOKEN_TYPE_GREATER_THAN:
+        elif node.operator_token.type == TOKEN_TYPE_GREATER_THAN:
             result, error = left.get_comparison_gt(right)
-        elif node.op_tok.type == TOKEN_TYPE_LESS_THAN_EQUAL_TO:
+        elif node.operator_token.type == TOKEN_TYPE_LESS_THAN_EQUAL_TO:
             result, error = left.get_comparison_lte(right)
-        elif node.op_tok.type == TOKEN_TYPE_GREATER_THAN_EQUAL_TO:
+        elif node.operator_token.type == TOKEN_TYPE_GREATER_THAN_EQUAL_TO:
             result, error = left.get_comparison_gte(right)
-        elif node.op_tok.matches(TOKEN_TYPE_KEYWORD, "AND"):
+        elif node.operator_token.matches(TOKEN_TYPE_KEYWORD, "AND"):
             result, error = left.anded_by(right)
-        elif node.op_tok.matches(TOKEN_TYPE_KEYWORD, "OR"):
+        elif node.operator_token.matches(TOKEN_TYPE_KEYWORD, "OR"):
             result, error = left.ored_by(right)
 
         if error:
@@ -3233,10 +3249,10 @@ class Interpreter:
 
         error = None
 
-        if node.op_tok.type == TOKEN_TYPE_MINUS:
+        if node.operator_token.type == TOKEN_TYPE_MINUS:
             # -x
             number, error = number.multiplied_by(Number(-1))
-        elif node.op_tok.matches(TOKEN_TYPE_KEYWORD, "NOT"):
+        elif node.operator_token.matches(TOKEN_TYPE_KEYWORD, "NOT"):
             # NOT x
             number, error = number.notted()
 
@@ -3280,6 +3296,7 @@ class Interpreter:
             expr, should_return_none = node.else_case
             expr_value = res.register(self.visit(expr, context))
             if res.should_return():
+                # Return the result at this point
                 return res
 
             # Return the ELSE value - Number.none if no value
@@ -3423,6 +3440,9 @@ class Interpreter:
         )
 
         if node.var_name_tok:
+            # Function definition assigned to 'func_name'
+            # if not anonymous
+            # This allows functions to be first class objects
             context.symbol_table.set(func_name, func_value)
 
         return res.success(func_value)
@@ -3530,6 +3550,7 @@ class Interpreter:
         if res.error:
             return res
 
+        # This is the value of the IMPORT statement
         return res.success(Number.none)
 
 #######################################
@@ -3584,6 +3605,7 @@ def run(filename, text, context=None, entry_pos=None, return_result=False):
 
     result = interpreter.visit(ast.node, context)
     if return_result:
+        # The value of run()
         return result, None
 
     return result.value, result.error
