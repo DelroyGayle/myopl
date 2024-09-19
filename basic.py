@@ -2069,51 +2069,53 @@ class Parser:
         result.register_advancement()  # Advance past THEN
         self.advance()
 
-        # Multiline statements begin with a newline \n or ;
-        if self.current_tok.type == TOKEN_TYPE_NEWLINE:
-            result.register_advancement()  # Advance past the NL
-            self.advance()
-
-            # Parse the FOR's Multiline statements
-            body = result.register(self.statements(in_a_function, in_a_loop))
+        if self.current_tok.type != TOKEN_TYPE_NEWLINE:
+            # This is a single FOR expression - Parse it
+            body = result.register(self.statement(in_a_function, in_a_loop))
             if result.error:
                 return result
 
-            if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
-                return result.failure(
-                    InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
-                        c.ERRORS["end_expected"],
-                    )
-                )
-
-            result.register_advancement()  # Advance past END
-            self.advance()
-
             """
             Successful Parse
-            'True' indicates that 'should_return_none' is set to True
-            Because FOR statement(s) do not return a value
+            'False' indicates that 'should_return_none' is set to False
+            Because a FOR expression does return a value
             """
             return result.success(
-                ForNode(
-                    var_name, start_value, end_value, step_value, body, True
-                )
+                ForNode(var_name, start_value, end_value, step_value,
+                        body, False)
             )
 
-        # This is a single FOR expression - Parse it
-        body = result.register(self.statement(in_a_function, in_a_loop))
+        # Otherwise
+        # Multiline statements begin with a newline \n or ;
+        result.register_advancement()  # Advance past the NL
+        self.advance()
+
+        # Parse the FOR's Multiline statements
+        body = result.register(self.statements(in_a_function, in_a_loop))
         if result.error:
             return result
 
+        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
+            return result.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    c.ERRORS["end_expected"],
+                )
+            )
+
+        result.register_advancement()  # Advance past END
+        self.advance()
+
         """
         Successful Parse
-        'False' indicates that 'should_return_none' is set to False
-        Because a FOR expression does return a value
+        'True' indicates that 'should_return_none' is set to True
+        Because FOR statement(s) do not return a value
         """
         return result.success(
-            ForNode(var_name, start_value, end_value, step_value, body, False)
+            ForNode(
+                var_name, start_value, end_value, step_value, body, True
+            )
         )
 
     def while_expr(self, in_a_function, in_a_loop):
@@ -2160,46 +2162,47 @@ class Parser:
         result.register_advancement()  # Advance past THEN
         self.advance()
 
-        # Multiline statements begin with a newline \n or ;
-        if self.current_tok.type == TOKEN_TYPE_NEWLINE:
-            result.register_advancement()  # Advance past the NL
-            self.advance()
-
-            # Parse the WHILE's Multiline statements
-            body = result.register(self.statements(in_a_function, in_a_loop))
+        if self.current_tok.type != TOKEN_TYPE_NEWLINE:
+            # This is a single WHILE expression - Parse it
+            body = result.register(self.statement(in_a_function, in_a_loop))
             if result.error:
                 return result
 
-            if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
-                return result.failure(
-                    InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
-                        c.ERRORS["end_expected"],
-                    )
-                )
-
-            result.register_advancement()  # Advance past END
-            self.advance()
-
             """
             Successful Parse
-            'True' indicates that 'should_return_none' is set to True
-            Because WHILE statement(s) do not return a value
+            'False' indicates that 'should_return_none' is set to False
+            Because a WHILE expression does return a value
             """
-            return result.success(WhileNode(condition, body, True))
+            return result.success(WhileNode(condition, body, False))
 
-        # This is a single WHILE expression - Parse it
-        body = result.register(self.statement(in_a_function, in_a_loop))
+        # Otherwise
+        # Multiline statements begin with a newline \n or ;
+        result.register_advancement()  # Advance past the NL
+        self.advance()
+
+        # Parse the WHILE's Multiline statements
+        body = result.register(self.statements(in_a_function, in_a_loop))
         if result.error:
             return result
 
+        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
+            return result.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    c.ERRORS["end_expected"],
+                )
+            )
+
+        result.register_advancement()  # Advance past END
+        self.advance()
+
         """
         Successful Parse
-        'False' indicates that 'should_return_none' is set to False
-        Because a WHILE expression does return a value
+        'True' indicates that 'should_return_none' is set to True
+        Because WHILE statement(s) do not return a value
         """
-        return result.success(WhileNode(condition, body, False))
+        return result.success(WhileNode(condition, body, True))
 
     def func_def(self, in_a_function, in_a_loop):
         """
