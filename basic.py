@@ -322,7 +322,7 @@ class Lexer:
             Python uses JavaScript's Number.MAX_VALUE
             which is approximately 1.7976931348623157E+308
             Anything above that is given the value of Infinity i.e. 'inf'
-            Check for this
+            Check for this.
             Alternatively, Use 1e308 as the limit for a number too big!
             """
             if thenumber != 0 and (
@@ -1021,7 +1021,7 @@ class Parser:
         # Successful parsed statement
         statements.append(statement)
 
-        # Check for any further optional statements
+        # Check for any further optional statements and parse them
         statements, result = self.parse_any_additional_statements(
             in_a_function, in_a_loop, statements, result
         )
@@ -1068,9 +1068,12 @@ class Parser:
         # Successful Parse
         return result.success(expression)
 
-    def parse_any_additional_statements(
-        self, in_a_function, in_a_loop, statements, result):
-        # Check for any further optional statements
+    def parse_any_additional_statements(self,
+                                        in_a_function,
+                                        in_a_loop,
+                                        statements,
+                                        result):
+        """ Check for any further optional statements and parse them """
         more_statements = True
 
         while True:
@@ -1225,46 +1228,12 @@ class Parser:
 
         if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "VAR"):
             # Parse VAR identifier = EXPR
-            result.register_advancement()  # Advance past VAR
-            self.advance()
-
-            # Parse the Name of the Identifier
-            if self.current_tok.type != TOKEN_TYPE_IDENTIFIER:
-                return result.failure(
-                    InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
-                        c.ERRORS["identifier_expected"],
-                    )
-                )
-
-            # Record the name
-            var_name = self.current_tok
-            result.register_advancement()  # Advance past the Identifier
-            self.advance()
-
-            # Parse =
-            if self.current_tok.type != TOKEN_TYPE_ASSIGN:
-                return result.failure(
-                    InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
-                        c.ERRORS["equal_expected"],
-                    )
-                )
-
-            result.register_advancement()  # Advance past =
-            self.advance()
-
-            # Parse the Assigned Expression
-            expression = result.register(self.expr(in_a_function, in_a_loop))
-            if result.error:
-                return result
-
-            # Successful Parse
-            return result.success(VarAssignNode(var_name, expression))
+            return self.parse_variable_assignment(in_a_function,
+                                                  in_a_loop,
+                                                  result)
 
         # Parse a non-assignment expression
+        # This will always be a bin_op Binary Operation
         node = result.register(
             self.bin_op(
                 in_a_function,
@@ -1285,6 +1254,48 @@ class Parser:
 
         # Successful Parse
         return result.success(node)
+
+    def parse_variable_assignment(self, in_a_function, in_a_loop, result):
+        """Parse VAR identifier = EXPR"""
+
+        result.register_advancement()  # Advance past VAR
+        self.advance()
+
+        # Parse the Name of the Identifier
+        if self.current_tok.type != TOKEN_TYPE_IDENTIFIER:
+            return result.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    c.ERRORS["identifier_expected"],
+                )
+            )
+
+        # Record the name
+        var_name = self.current_tok
+        result.register_advancement()  # Advance past the Identifier
+        self.advance()
+
+        # Parse =
+        if self.current_tok.type != TOKEN_TYPE_ASSIGN:
+            return result.failure(
+                InvalidSyntaxError(
+                    self.current_tok.pos_start,
+                    self.current_tok.pos_end,
+                    c.ERRORS["equal_expected"],
+                )
+            )
+
+        result.register_advancement()  # Advance past =
+        self.advance()
+
+        # Parse the Assigned Expression
+        expression = result.register(self.expr(in_a_function, in_a_loop))
+        if result.error:
+            return result
+
+        # Successful Parse
+        return result.success(VarAssignNode(var_name, expression))
 
     def comp_expr(self, in_a_function, in_a_loop):
         """Parse a Comparison Expression"""

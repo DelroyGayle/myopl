@@ -35,7 +35,7 @@ ERRORS = {
                              "int, float, identifier, "
                              "'+', '-', '(', '[' or 'NOT'"),
   "identifier_expected":  "Expected identifier",
-  "equal_expected": "Expected '='",
+  "equal_expected": "Expected a single '='",
   "expr_syntax_error": ("Expected 'VAR', 'IF', 'FOR', 'WHILE', 'FUN', "
                         "int, float, identifier, '+', '-', '(', '[' or 'NOT'"),
   "comp_syntax_error": ("Expected int, float, identifier, '+', '-', '(', '[', "
