@@ -73,6 +73,9 @@ ERRORS = {
   "number_conversion_error": "Could not convert this to a number",
   "illegal_hex_char": ("Two Hex characters expected \\xhh, "
                        "h either 0-9 A-F a-f"),
+  "bad_break": "BREAK can be used only within a loop",
+  "bad_continue": "CONTINUE can be used only within a loop",
+  "bad_return": "RETURN can be used only within a function",
   # RUNTIME ERRORS
   "division_by_zero": "Division by zero",
   "modulus_by_zero": "Modulus using zero",

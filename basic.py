@@ -316,8 +316,9 @@ class Lexer:
             Check for this
             Alternatively, Use 1e308 as the limit for a number too big!
             """
-            if (math.isinf(thenumber) or
-               (thelog10 := math.log10(thenumber)) >= 308):
+            if (thenumber != 0 and
+                (math.isinf(thenumber) or
+                (thelog10 := math.log10(thenumber)) >= 308)):
                 raise OverflowError
             elif thelog10 <= -308:
                 return (None, InvalidSyntaxError(pos_start, self.pos,
@@ -364,8 +365,10 @@ class Lexer:
         try:
             thenumber = (int(num_str) if dot_count == 0
                          else float(num_str))
-            # Check whether the comverted number is too big
-            if (math.isinf(thenumber) or math.log10(thenumber)) >= 308:
+            # Check whether the converted number is too big
+            if (thenumber != 0 and
+                (math.isinf(thenumber) or 
+                 math.log10(thenumber)) >= 308):
                 raise OverflowError
 
             # Successful Convert to Number
@@ -903,7 +906,7 @@ class Parser:
             self.current_tok = self.tokens[self.token_index]
 
     def parse(self):
-        res = self.statements()
+        res = self.statements(False, False)
         if not res.error and self.current_tok.type != TOKEN_TYPE_EOF:
             """
             This means there are still tokens 'left over'
@@ -921,7 +924,7 @@ class Parser:
 
     ###################################
 
-    def statements(self):
+    def statements(self, in_a_function, in_a_loop):
         # Parse a list of statements. Minimum: One Statement
         res = ParseResult()  # Initialise
         statements = []
@@ -934,7 +937,9 @@ class Parser:
             self.advance()
 
         # Parse a statement
-        statement = res.register(self.statement())
+        statement = res.register(
+                        self.statement(in_a_function, in_a_loop)
+                    )
         if res.error:
             # Error occurred with the very first statement!
             return res
@@ -948,10 +953,10 @@ class Parser:
         while True:
             newline_count = 0
             while self.current_tok.type == TOKEN_TYPE_NEWLINE:
-                # Multiline statements begin with a newline \n or ;
+                # Advance past any newlines \n or ;
                 res.register_advancement()  # Advance past the NL
                 self.advance()
-                newline_count += 1  # Count each newline
+                newline_count += 1  # Count each newline ;
             if newline_count == 0:
                 # Since the count is zero,
                 # there are definitely no further statements
@@ -967,7 +972,9 @@ class Parser:
             there is the possibility of another statement
             'try_register' will check to see if a valid statement follows
             """
-            statement = res.try_register(self.statement())
+            statement = res.try_register(
+                            self.statement(in_a_function, in_a_loop)
+                        )
             if not statement:
                 """
                 Since this is not a statement
@@ -994,7 +1001,7 @@ class Parser:
             ListNode(statements, pos_start, self.current_tok.pos_end.copy())
         )
 
-    def statement(self):
+    def statement(self, in_a_function, in_a_loop):
         """ Parse a single statement """
         res = ParseResult()  # Initialise
         # Record the beginning of the Statement
@@ -1004,25 +1011,43 @@ class Parser:
             res.register_advancement()  # Advance past RETURN
             self.advance()
 
+            # Check whether the RETURN is being used within a function
+            if not in_a_function:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start, self.current_tok.pos_end,
+                    c.ERRORS["bad_return"],
+                ))
+
             """
             RETURN has the option of being followed by an EXPR
             So, does an EXPR follow?
             """
-            expr = res.try_register(self.expr())
-            if not expr:
+            expression = res.try_register(self.expr(in_a_function,
+                                                    in_a_loop)
+                                          )
+            if not expression:
                 # No! Revert to original position
                 # This is a RETURN without an EXPR
                 # therefore 'expr' has the value of None
                 self.reverse(res.to_reverse_count)
 
             return res.success(
-                ReturnNode(expr, pos_start, self.current_tok.pos_start.copy())
+                ReturnNode(expression, pos_start,
+                           self.current_tok.pos_start.copy())
             )
 
         if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "CONTINUE"):
             res.register_advancement()  # Advance past CONTINUE
             self.advance()
             # current_tok.pos_start points to the token that follows CONTINUE
+
+            # Check whether the CONTINUE is being used within a loop
+            if not in_a_loop:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start, self.current_tok.pos_end,
+                    c.ERRORS["bad_continue"],
+                ))
+
             return res.success(
                 ContinueNode(pos_start, self.current_tok.pos_start.copy())
             )
@@ -1031,6 +1056,14 @@ class Parser:
             res.register_advancement()  # Advance past BREAK
             self.advance()
             # current_tok.pos_start points to the token that follows BREAK
+
+            # Check whether the BREAK is being used within a loop
+            if not in_a_loop:
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start, self.current_tok.pos_end,
+                    c.ERRORS["bad_break"],
+                ))
+
             return res.success(
                 BreakNode(pos_start, self.current_tok.pos_start.copy())
             )
@@ -1045,14 +1078,16 @@ class Parser:
                     c.ERRORS["string_expected"],
                 ))
 
-            string = res.register(self.atom())
+            string = res.register(self.atom(in_a_function, in_a_loop))
             # current_tok.pos_start points to the token that follows
             # the IMPORT string
             return res.success(ImportNode(string, pos_start,
                                           self.current_tok.pos_start.copy()))
 
         # Otherwise Parse a single expression
-        expr = res.register(self.expr())
+        expression = res.register(self.expr(in_a_function,
+                                            in_a_loop)
+                                  )
         if res.error:
             return res.failure(
                 InvalidSyntaxError(
@@ -1063,9 +1098,9 @@ class Parser:
             )
 
         # Successful Parse
-        return res.success(expr)
+        return res.success(expression)
 
-    def expr(self):
+    def expr(self, in_a_function, in_a_loop):
         """ Parse a Single Expression """
         res = ParseResult()  # Initialise
 
@@ -1103,16 +1138,19 @@ class Parser:
             self.advance()
 
             # Parse the Assigned Expression
-            expr = res.register(self.expr())
+            expression = res.register(self.expr(in_a_function,
+                                                in_a_loop)
+                                      )
             if res.error:
                 return res
 
             # Successful Parse
-            return res.success(VarAssignNode(var_name, expr))
+            return res.success(VarAssignNode(var_name, expression))
 
         # Parse a non-assignment expression
         node = res.register(
             self.bin_op(
+                in_a_function, in_a_loop,
                 self.comp_expr, ((TOKEN_TYPE_KEYWORD, "AND"),
                                  (TOKEN_TYPE_KEYWORD, "OR"))
             )
@@ -1130,7 +1168,7 @@ class Parser:
         # Successful Parse
         return res.success(node)
 
-    def comp_expr(self):
+    def comp_expr(self, in_a_function, in_a_loop):
         """ Parse a Comparison Expression """
         res = ParseResult()  # Initialise
 
@@ -1140,7 +1178,10 @@ class Parser:
             res.register_advancement()  # Advance past NOT
             self.advance()
 
-            node = res.register(self.comp_expr())  # Handles NOT NOT ...
+            # Handles NOT NOT ...
+            node = res.register(self.comp_expr(in_a_function,
+                                               in_a_loop)
+                                )
             if res.error:
                 return res
 
@@ -1149,6 +1190,7 @@ class Parser:
 
         node = res.register(
             self.bin_op(
+                in_a_function, in_a_loop,
                 self.arith_expr, (TOKEN_TYPE_EQUAL_TO,
                                   TOKEN_TYPE_NOT_EQUAL_TO,
                                   TOKEN_TYPE_LESS_THAN,
@@ -1171,20 +1213,22 @@ class Parser:
         # Successful Parse
         return res.success(node)
 
-    def arith_expr(self):
+    def arith_expr(self, in_a_function, in_a_loop):
         """ Parse X + Y or X - Y """
-        return self.bin_op(self.term, (TOKEN_TYPE_PLUS,
+        return self.bin_op(in_a_function, in_a_loop,
+                           self.term, (TOKEN_TYPE_PLUS,
                                        TOKEN_TYPE_MINUS)
                            )
 
-    def term(self):
+    def term(self, in_a_function, in_a_loop):
         """ Parse X * Y or X / Y or X % Y"""
-        return self.bin_op(self.factor, (TOKEN_TYPE_MULTIPLY,
+        return self.bin_op(in_a_function, in_a_loop,
+                           self.factor, (TOKEN_TYPE_MULTIPLY,
                                          TOKEN_TYPE_DIVIDE,
                                          TOKEN_TYPE_MODULUS)
                            )
 
-    def factor(self):
+    def factor(self, in_a_function, in_a_loop):
         """ Parse +X or -X """
         res = ParseResult()  # Initialise
         tok = self.current_tok
@@ -1192,26 +1236,29 @@ class Parser:
         if tok.type in (TOKEN_TYPE_PLUS, TOKEN_TYPE_MINUS):
             res.register_advancement()  # Advance past + OR -
             self.advance()
-            factor = res.register(self.factor())
+            factor = res.register(self.factor(in_a_function,
+                                              in_a_loop)
+                                  )
             if res.error:
                 return res
 
             # Handles - - ... OR even + + ...
             return res.success(UnaryOpNode(tok, factor))
 
-        return self.power()
+        return self.power(in_a_function, in_a_loop)
 
-    def power(self):
+    def power(self, in_a_function, in_a_loop):
         """ Parse x^y """
-        return self.bin_op(self.call, (TOKEN_TYPE_POWER,), self.factor)
+        return self.bin_op(in_a_function, in_a_loop,
+                           self.call, (TOKEN_TYPE_POWER,), self.factor)
 
-    def call(self):
+    def call(self, in_a_function, in_a_loop):
         """
         Parse function_call(x,...) OR function_call() OR ATOM """
         res = ParseResult()  # Initialise
 
         # This in turn, enables higher-order functions
-        atom = res.register(self.atom())
+        atom = res.register(self.atom(in_a_function, in_a_loop))
         if res.error:
             return res
 
@@ -1228,7 +1275,8 @@ class Parser:
                 self.advance()
             else:
                 # Parse the first argument
-                arg_nodes.append(res.register(self.expr()))
+                the_arg = self.expr(in_a_function, in_a_loop)
+                arg_nodes.append(res.register(the_arg))
                 if res.error:
                     return res.failure(
                         InvalidSyntaxError(
@@ -1244,7 +1292,8 @@ class Parser:
                     self.advance()
 
                     # Parse an argument
-                    arg_nodes.append(res.register(self.expr()))
+                    the_arg = self.expr(in_a_function, in_a_loop)
+                    arg_nodes.append(res.register(the_arg))
                     if res.error:
                         return res
 
@@ -1264,7 +1313,7 @@ class Parser:
             return res.success(CallNode(atom, arg_nodes))
         return res.success(atom)
 
-    def atom(self):
+    def atom(self, in_a_function, in_a_loop):
         """
         Parse a number or a string or a Variable or
         (EXPR) or [...] or IF or FOR or WHILE or FUN
@@ -1298,7 +1347,7 @@ class Parser:
             res.register_advancement()  # Advance past the Left Parenthesis
             self.advance()
             # Parse EXPR
-            expr = res.register(self.expr())
+            expr = res.register(self.expr(in_a_function, in_a_loop))
             if res.error:
                 return res
             # Closing Parenthesis
@@ -1319,7 +1368,7 @@ class Parser:
 
         elif tok.type == TOKEN_TYPE_LSQUARE:
             # Parse [EXPR, ...], []
-            list_expr = res.register(self.list_expr())
+            list_expr = res.register(self.list_expr(in_a_function, in_a_loop))
             if res.error:
                 return res
             # Successful Parse
@@ -1327,7 +1376,7 @@ class Parser:
 
         elif tok.matches(TOKEN_TYPE_KEYWORD, "IF"):
             # Parse IF expression
-            if_expr = res.register(self.if_expr())
+            if_expr = res.register(self.if_expr(in_a_function, in_a_loop))
             if res.error:
                 return res
             # Successful Parse
@@ -1335,7 +1384,8 @@ class Parser:
 
         elif tok.matches(TOKEN_TYPE_KEYWORD, "FOR"):
             # Parse FOR expression
-            for_expr = res.register(self.for_expr())
+            # True indicates that a Loop is being parsed
+            for_expr = res.register(self.for_expr(in_a_function, True))
             if res.error:
                 return res
             # Successful Parse
@@ -1343,7 +1393,8 @@ class Parser:
 
         elif tok.matches(TOKEN_TYPE_KEYWORD, "WHILE"):
             # Parse WHILE expression
-            while_expr = res.register(self.while_expr())
+            # True indicates that a Loop is being parsed
+            while_expr = res.register(self.while_expr(in_a_function, True))
             if res.error:
                 return res
             # Successful Parse
@@ -1351,7 +1402,8 @@ class Parser:
 
         elif tok.matches(TOKEN_TYPE_KEYWORD, "FUN"):
             # Parse FUN expression
-            func_def = res.register(self.func_def())
+            # True indicates that a Function Definition is being parsed
+            func_def = res.register(self.func_def(True, in_a_loop))
             if res.error:
                 return res
             # Successful Parse
@@ -1365,7 +1417,7 @@ class Parser:
             )
         )
 
-    def list_expr(self):
+    def list_expr(self, in_a_function, in_a_loop):
         """
         Parse a List of Expressions [EXPR, ...] which an be empty i.e. []
         Need to also handle nested lists
@@ -1394,7 +1446,8 @@ class Parser:
             self.advance()
         else:
             # Parse the first EXPR
-            element_nodes.append(res.register(self.expr()))
+            expression = res.register(self.expr(in_a_function, in_a_loop))
+            element_nodes.append(expression)
             if res.error:
                 return res.failure(
                     InvalidSyntaxError(
@@ -1410,7 +1463,8 @@ class Parser:
                 self.advance()
 
                 # Parse an Expression
-                element_nodes.append(res.register(self.expr()))
+                expression = res.register(self.expr(in_a_function, in_a_loop))
+                element_nodes.append(expression)
                 if res.error:
                     return res
 
@@ -1433,7 +1487,7 @@ class Parser:
             ListNode(element_nodes, pos_start, self.current_tok.pos_end.copy())
         )
 
-    def if_expr(self):
+    def if_expr(self, in_a_function, in_a_loop):
         """
         Parse IF Expression/Statement
 
@@ -1490,7 +1544,10 @@ class Parser:
 
         res = ParseResult()  # Initialise
         # Parse the entire IF expression/statement
-        all_cases = res.register(self.if_expr_cases("IF"))
+        all_cases = res.register(self.if_expr_cases("IF",
+                                                    in_a_function,
+                                                    in_a_loop)
+                                 )
         if res.error:
             return res
 
@@ -1503,7 +1560,7 @@ class Parser:
         cases, else_case = all_cases
         return res.success(IfNode(cases, else_case))
 
-    def if_expr_b(self):
+    def if_expr_b(self, in_a_function, in_a_loop):
         """
         Parse all the ELIF expressions/statements
 
@@ -1512,9 +1569,9 @@ class Parser:
                       (statement if-expr-b|if-expr-c?)
                     | (NEWLINE statements KEYWORD:END|if-expr-b|if-expr-c)
         """
-        return self.if_expr_cases("ELIF")
+        return self.if_expr_cases("ELIF", in_a_function, in_a_loop)
 
-    def if_expr_c(self):
+    def if_expr_c(self, in_a_function, in_a_loop):
         """
         Parse the ELSE expression/statement
 
@@ -1537,7 +1594,9 @@ class Parser:
                 self.advance()
 
                 # Parse the ELSE's Multiline statements
-                statements = res.register(self.statements())
+                statements = res.register(self.statements(in_a_function,
+                                                          in_a_loop)
+                                          )
                 if res.error:
                     return res
 
@@ -1560,7 +1619,9 @@ class Parser:
                     )
             else:
                 # This is an ELSE expression - Parse it
-                expr = res.register(self.statement())
+                expr = res.register(self.statement(in_a_function,
+                                                   in_a_loop)
+                                    )
                 if res.error:
                     return res
 
@@ -1573,26 +1634,30 @@ class Parser:
         # Successful ELSE parse
         return res.success(else_case)
 
-    def if_expr_b_or_c(self):
+    def if_expr_b_or_c(self, in_a_function, in_a_loop):
         """ Parse ELIF/ELSE Expressions/Statements """
         res = ParseResult()  # Initialise
         cases, else_case = [], None
 
         if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "ELIF"):
             # Handle ELIF
-            all_cases = res.register(self.if_expr_b())
+            all_cases = res.register(self.if_expr_b(in_a_function,
+                                                    in_a_loop)
+                                     )
             if res.error:
                 return res
             cases, else_case = all_cases
         else:
             # Handle ELSE
-            else_case = res.register(self.if_expr_c())
+            else_case = res.register(self.if_expr_c(in_a_function,
+                                                    in_a_loop)
+                                     )
             if res.error:
                 return res
 
         return res.success((cases, else_case))
 
-    def if_expr_cases(self, case_keyword):
+    def if_expr_cases(self, case_keyword, in_a_function, in_a_loop):
         """ Parse IF/ELIF Expressions/Statements """
         res = ParseResult()  # Initialise
         cases = []
@@ -1613,7 +1678,7 @@ class Parser:
         self.advance()
 
         # Parse the IF condition
-        condition = res.register(self.expr())
+        condition = res.register(self.expr(in_a_function, in_a_loop))
         if res.error:
             return res
 
@@ -1635,7 +1700,8 @@ class Parser:
             self.advance()
 
             # Parse the Multiline statements
-            statements = res.register(self.statements())
+            statements = res.register(self.statements(in_a_function,
+                                                      in_a_loop))
             if res.error:
                 return res
 
@@ -1650,14 +1716,18 @@ class Parser:
                 self.advance()
             else:
                 # Handle ELIF and ELSE statements
-                all_cases = res.register(self.if_expr_b_or_c())
+                all_cases = res.register(self.if_expr_b_or_c(in_a_function,
+                                                             in_a_loop)
+                                         )
                 if res.error:
                     return res
                 new_cases, else_case = all_cases
                 cases.extend(new_cases)
         else:
             # This is a single IF expression - Parse it
-            expr = res.register(self.statement())
+            expr = res.register(self.statement(in_a_function,
+                                               in_a_loop)
+                                )
             if res.error:
                 return res
 
@@ -1667,7 +1737,9 @@ class Parser:
             """
             cases.append((condition, expr, False))
 
-            all_cases = res.register(self.if_expr_b_or_c())
+            all_cases = res.register(self.if_expr_b_or_c(in_a_function,
+                                                         in_a_loop)
+                                     )
             if res.error:
                 return res
             new_cases, else_case = all_cases
@@ -1676,7 +1748,7 @@ class Parser:
         # Successful Parse
         return res.success((cases, else_case))
 
-    def for_expr(self):
+    def for_expr(self, in_a_function, in_a_loop):
         """
         Parse FOR Expression/Statement
 
@@ -1742,7 +1814,7 @@ class Parser:
         self.advance()
 
         # Parse the FOR's Start expression
-        start_value = res.register(self.expr())
+        start_value = res.register(self.expr(in_a_function, in_a_loop))
         if res.error:
             return res
 
@@ -1759,7 +1831,7 @@ class Parser:
         self.advance()
 
         # Parse the FOR's TO/End expression
-        end_value = res.register(self.expr())
+        end_value = res.register(self.expr(in_a_function, in_a_loop))
         if res.error:
             return res
 
@@ -1768,7 +1840,7 @@ class Parser:
             self.advance()
 
             # Parse the FOR's STEP expression
-            step_value = res.register(self.expr())
+            step_value = res.register(self.expr(in_a_function, in_a_loop))
             if res.error:
                 return res
         else:
@@ -1793,7 +1865,7 @@ class Parser:
             self.advance()
 
             # Parse the FOR's Multiline statements
-            body = res.register(self.statements())
+            body = res.register(self.statements(in_a_function, in_a_loop))
             if res.error:
                 return res
 
@@ -1821,7 +1893,7 @@ class Parser:
             )
 
         # This is a single FOR expression - Parse it
-        body = res.register(self.statement())
+        body = res.register(self.statement(in_a_function, in_a_loop))
         if res.error:
             return res
 
@@ -1834,7 +1906,7 @@ class Parser:
             ForNode(var_name, start_value, end_value, step_value, body, False)
         )
 
-    def while_expr(self):
+    def while_expr(self, in_a_function, in_a_loop):
         """
         Parse WHILE Expression/Statement
 
@@ -1862,7 +1934,7 @@ class Parser:
         self.advance()
 
         # Parse the WHILE condition
-        condition = res.register(self.expr())
+        condition = res.register(self.expr(in_a_function, in_a_loop))
         if res.error:
             return res
 
@@ -1884,7 +1956,7 @@ class Parser:
             self.advance()
 
             # Parse the WHILE's Multiline statements
-            body = res.register(self.statements())
+            body = res.register(self.statements(in_a_function, in_a_loop))
             if res.error:
                 return res
 
@@ -1908,7 +1980,7 @@ class Parser:
             return res.success(WhileNode(condition, body, True))
 
         # This is a single WHILE expression - Parse it
-        body = res.register(self.statement())
+        body = res.register(self.statement(in_a_function, in_a_loop))
         if res.error:
             return res
 
@@ -1919,7 +1991,7 @@ class Parser:
         """
         return res.success(WhileNode(condition, body, False))
 
-    def func_def(self):
+    def func_def(self, in_a_function, in_a_loop):
         """
         Parse FUN Expression/Statement
 
@@ -2032,7 +2104,7 @@ class Parser:
             self.advance()
 
             # Parse the function definition's body
-            body = res.register(self.expr())
+            body = res.register(self.expr(in_a_function, in_a_loop))
             if res.error:
                 return res
 
@@ -2060,7 +2132,7 @@ class Parser:
         self.advance()
 
         # Parse the FUN's Multiline statements
-        body = res.register(self.statements())
+        body = res.register(self.statements(in_a_function, in_a_loop))
         if res.error:
             return res
 
@@ -2098,12 +2170,13 @@ class Parser:
 
     ###################################
 
-    def bin_op(self, func_a, ops, func_b=None):
+    def bin_op(self, in_a_function, in_a_loop,
+               func_a, ops, func_b=None):
         if func_b is None:
             func_b = func_a
 
         res = ParseResult()  # Initialise
-        left = res.register(func_a())
+        left = res.register(func_a(in_a_function, in_a_loop))
         if res.error:
             return res
 
@@ -2114,7 +2187,7 @@ class Parser:
             op_tok = self.current_tok
             res.register_advancement()  # Advance past the Operator Token
             self.advance()
-            right = res.register(func_b())
+            right = res.register(func_b(in_a_function, in_a_loop))
             if res.error:
                 return res
             left = BinOpNode(left, op_tok, right)
