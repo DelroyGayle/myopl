@@ -674,25 +674,25 @@ class Lexer:
 
 
 class NumberNode:
-    def __init__(self, tok):
-        self.tok = tok
+    def __init__(self, token):
+        self.token = token
 
-        self.pos_start = self.tok.pos_start
-        self.pos_end = self.tok.pos_end
+        self.pos_start = self.token.pos_start
+        self.pos_end = self.token.pos_end
 
     def __repr__(self):
-        return f"{self.tok}"
+        return f"{self.token}"
 
 
 class StringNode:
-    def __init__(self, tok):
-        self.tok = tok
+    def __init__(self, token):
+        self.token = token
 
-        self.pos_start = self.tok.pos_start
-        self.pos_end = self.tok.pos_end
+        self.pos_start = self.token.pos_start
+        self.pos_end = self.token.pos_end
 
     def __repr__(self):
-        return f"{self.tok}"
+        return f"{self.token}"
 
 
 class ListNode:
@@ -807,19 +807,19 @@ class WhileNode:
 
 class FuncDefNode:
     def __init__(
-        self, var_name_tok, arg_name_toks, body_node, should_auto_return
+        self, var_name_tok, arg_name_tokens, body_node, should_auto_return
     ):
         self.var_name_tok = var_name_tok
-        self.arg_name_toks = arg_name_toks
+        self.arg_name_tokens = arg_name_tokens
         self.body_node = body_node
         self.should_auto_return = should_auto_return
 
         if self.var_name_tok:
             # This FUN has a name - record its position
             self.pos_start = self.var_name_tok.pos_start
-        elif len(self.arg_name_toks) > 0:
+        elif len(self.arg_name_tokens) > 0:
             # Anonymous FUN - record the beginning of the FIRST Arg
-            self.pos_start = self.arg_name_toks[0].pos_start
+            self.pos_start = self.arg_name_tokens[0].pos_start
         else:
             # Anonymous FUN, No Args! Body only!
             # Record the beginning of the body of the FUN expression
@@ -966,7 +966,7 @@ class Parser:
         self.token_index += 1
         self.update_current_tok()
         # Return new token
-        return self.current_tok
+        return self.current_token
 
     def reverse(self, amount=1):
         """
@@ -978,12 +978,12 @@ class Parser:
         self.token_index -= amount
         # Reset to the 'token' at this new position
         self.update_current_tok()
-        return self.current_tok
+        return self.current_token
 
     def update_current_tok(self):
         """Fetch Next Token"""
         if self.token_index >= 0 and self.token_index < len(self.tokens):
-            self.current_tok = self.tokens[self.token_index]
+            self.current_token = self.tokens[self.token_index]
 
     def parse(self):
         """
@@ -993,7 +993,7 @@ class Parser:
         """
 
         result = self.statements(False, False)
-        if not result.error and self.current_tok.type != TOKEN_TYPE_EOF:
+        if not result.error and self.current_token.type != TOKEN_TYPE_EOF:
             """
             This means there are still tokens 'left over'
             after Parsing as ended. Something therefore has gone wrong.
@@ -1001,8 +1001,8 @@ class Parser:
             """
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["tokens_out_of_place"],
                 )
             )
@@ -1016,10 +1016,10 @@ class Parser:
         result = ParseResult()  # Initialise
         statements = []
         # Record the beginning of the First Statement
-        pos_start = self.current_tok.pos_start.copy()
+        pos_start = self.current_token.pos_start.copy()
 
         # To begin with, advance past any newlines \n or ;
-        while self.current_tok.type == TOKEN_TYPE_NEWLINE:
+        while self.current_token.type == TOKEN_TYPE_NEWLINE:
             result.register_advancement()  # Advance past the NL
             self.advance()
 
@@ -1040,7 +1040,7 @@ class Parser:
         # Return a list of parsed statement nodes
         return result.success(
             # Record the end of the Last Statement
-            ListNode(statements, pos_start, self.current_tok.pos_end.copy())
+            ListNode(statements, pos_start, self.current_token.pos_end.copy())
         )
 
     def statement(self, in_a_function, in_a_loop):
@@ -1048,20 +1048,20 @@ class Parser:
 
         result = ParseResult()  # Initialise
         # Record the beginning of the Statement
-        pos_start = self.current_tok.pos_start.copy()
+        pos_start = self.current_token.pos_start.copy()
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "RETURN"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "RETURN"):
             return self.parse_return(
                 in_a_function, in_a_loop, result, pos_start
             )
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "CONTINUE"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "CONTINUE"):
             return self.parse_continue(in_a_loop, result, pos_start)
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "BREAK"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "BREAK"):
             return self.parse_break(in_a_loop, result, pos_start)
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "IMPORT"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "IMPORT"):
             return self.parse_import(
                 in_a_function, in_a_loop, result, pos_start
             )
@@ -1071,8 +1071,8 @@ class Parser:
         if result.error:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["statement_syntax_error"],
                 )
             )
@@ -1091,7 +1091,7 @@ class Parser:
 
         while True:
             newline_count = 0
-            while self.current_tok.type == TOKEN_TYPE_NEWLINE:
+            while self.current_token.type == TOKEN_TYPE_NEWLINE:
                 # To begin with, advance past any newlines \n or ;
                 result.register_advancement()  # Advance past the NL
                 self.advance()
@@ -1148,8 +1148,8 @@ class Parser:
         if not in_a_function:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["bad_return"],
                 )
             )
@@ -1167,7 +1167,7 @@ class Parser:
 
         return result.success(
             ReturnNode(
-                expression, pos_start, self.current_tok.pos_start.copy()
+                expression, pos_start, self.current_token.pos_start.copy()
             )
         )
 
@@ -1176,20 +1176,20 @@ class Parser:
 
         result.register_advancement()  # Advance past CONTINUE
         self.advance()
-        # current_tok.pos_start points to the token that follows CONTINUE
+        # current_token.pos_start points to the token that follows CONTINUE
 
         # Check whether the CONTINUE is being used within a loop
         if not in_a_loop:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["bad_continue"],
                 )
             )
 
         return result.success(
-            ContinueNode(pos_start, self.current_tok.pos_start.copy())
+            ContinueNode(pos_start, self.current_token.pos_start.copy())
         )
 
     def parse_break(self, in_a_loop, result, pos_start):
@@ -1197,20 +1197,20 @@ class Parser:
 
         result.register_advancement()  # Advance past BREAK
         self.advance()
-        # current_tok.pos_start points to the token that follows BREAK
+        # current_token.pos_start points to the token that follows BREAK
 
         # Check whether the BREAK is being used within a loop
         if not in_a_loop:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["bad_break"],
                 )
             )
 
         return result.success(
-            BreakNode(pos_start, self.current_tok.pos_start.copy())
+            BreakNode(pos_start, self.current_token.pos_start.copy())
         )
 
     def parse_import(self, in_a_function, in_a_loop, result, pos_start):
@@ -1219,20 +1219,20 @@ class Parser:
         result.register_advancement()  # Advance past IMPORT
         self.advance()
 
-        if not self.current_tok.type == TOKEN_TYPE_STRING:
+        if not self.current_token.type == TOKEN_TYPE_STRING:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["string_expected"],
                 )
             )
 
         string = result.register(self.atom(in_a_function, in_a_loop))
-        # current_tok.pos_start points to the token that follows
+        # current_token.pos_start points to the token that follows
         # the IMPORT string
         return result.success(
-            ImportNode(string, pos_start, self.current_tok.pos_start.copy())
+            ImportNode(string, pos_start, self.current_token.pos_start.copy())
         )
 
     def expr(self, in_a_function, in_a_loop):
@@ -1240,7 +1240,7 @@ class Parser:
 
         result = ParseResult()  # Initialise
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "VAR"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "VAR"):
             # Parse VAR identifier = EXPR
             return self.parse_variable_assignment(in_a_function,
                                                   in_a_loop,
@@ -1260,8 +1260,8 @@ class Parser:
         if result.error:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["expr_syntax_error"],
                 )
             )
@@ -1276,26 +1276,26 @@ class Parser:
         self.advance()
 
         # Parse the Name of the Identifier
-        if self.current_tok.type != TOKEN_TYPE_IDENTIFIER:
+        if self.current_token.type != TOKEN_TYPE_IDENTIFIER:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["identifier_expected"],
                 )
             )
 
         # Record the name
-        var_name = self.current_tok
+        var_name = self.current_token
         result.register_advancement()  # Advance past the Identifier
         self.advance()
 
         # Parse =
-        if self.current_tok.type != TOKEN_TYPE_ASSIGN:
+        if self.current_token.type != TOKEN_TYPE_ASSIGN:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["equal_expected"],
                 )
             )
@@ -1316,9 +1316,9 @@ class Parser:
 
         result = ParseResult()  # Initialise
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "NOT"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "NOT"):
             # Parse NOT EXPR
-            operator_token = self.current_tok
+            operator_token = self.current_token
             result.register_advancement()  # Advance past NOT
             self.advance()
 
@@ -1342,8 +1342,8 @@ class Parser:
         if result.error:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["comp_syntax_error"],
                 )
             )
@@ -1372,9 +1372,9 @@ class Parser:
     def factor(self, in_a_function, in_a_loop):
         """Parse +X or -X"""
         result = ParseResult()  # Initialise
-        tok = self.current_tok
+        token = self.current_token
 
-        if tok.type in (TOKEN_TYPE_PLUS, TOKEN_TYPE_MINUS):
+        if token.type in (TOKEN_TYPE_PLUS, TOKEN_TYPE_MINUS):
             result.register_advancement()  # Advance past + OR -
             self.advance()
             factor = result.register(self.factor(in_a_function, in_a_loop))
@@ -1382,7 +1382,7 @@ class Parser:
                 return result
 
             # Handles - - ... OR even + + ...
-            return result.success(UnaryOpNode(tok, factor))
+            return result.success(UnaryOpNode(token, factor))
 
         return self.power(in_a_function, in_a_loop)
 
@@ -1406,7 +1406,7 @@ class Parser:
         if result.error:
             return result
 
-        if self.current_tok.type != TOKEN_TYPE_LPAREN:
+        if self.current_token.type != TOKEN_TYPE_LPAREN:
             """
             This is NOT a Function Call
             An 'atom' can be either a number, a string,
@@ -1429,7 +1429,7 @@ class Parser:
         # List of argument nodes which can be empty i.e. []
         arg_nodes = []
 
-        if self.current_tok.type == TOKEN_TYPE_RPAREN:
+        if self.current_token.type == TOKEN_TYPE_RPAREN:
             # Advance past the Right Parenthesis
             # This is a Function Call without arguments i.e. func()
             result.register_advancement()
@@ -1441,14 +1441,14 @@ class Parser:
             if result.error:
                 return result.failure(
                     InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
+                        self.current_token.pos_start,
+                        self.current_token.pos_end,
                         c.ERRORS["arg1_syntax_error"],
                     )
                 )
 
             # Optionally more arguments could follow preceded by a comma
-            while self.current_tok.type == TOKEN_TYPE_COMMA:
+            while self.current_token.type == TOKEN_TYPE_COMMA:
                 result.register_advancement()  # Advance past ,
                 self.advance()
 
@@ -1459,11 +1459,11 @@ class Parser:
                     return result
 
             # if no comma, then the closing right parenthesis must follow
-            if self.current_tok.type != TOKEN_TYPE_RPAREN:
+            if self.current_token.type != TOKEN_TYPE_RPAREN:
                 return result.failure(
                     InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
+                        self.current_token.pos_start,
+                        self.current_token.pos_end,
                         c.ERRORS["comma_rparen_expected"],
                     )
                 )
@@ -1479,30 +1479,30 @@ class Parser:
         (EXPR) or [...] or IF or FOR or WHILE or FUN
         """
         result = ParseResult()  # Initialise
-        tok = self.current_tok
+        token = self.current_token
 
-        if tok.type in (TOKEN_TYPE_INT, TOKEN_TYPE_FLOAT):
+        if token.type in (TOKEN_TYPE_INT, TOKEN_TYPE_FLOAT):
             # Parse a Number
             result.register_advancement()  # Advance past the Number
             self.advance()
             # Successful Parse
-            return result.success(NumberNode(tok))
+            return result.success(NumberNode(token))
 
-        elif tok.type == TOKEN_TYPE_STRING:
+        elif token.type == TOKEN_TYPE_STRING:
             # Parse a String
             result.register_advancement()  # Advance past the String
             self.advance()
             # Successful Parse
-            return result.success(StringNode(tok))
+            return result.success(StringNode(token))
 
-        elif tok.type == TOKEN_TYPE_IDENTIFIER:
+        elif token.type == TOKEN_TYPE_IDENTIFIER:
             # Parse an Identifier
             result.register_advancement()  # Advance past the Identifier
             self.advance()
             # Successful Parse
-            return result.success(VarAccessNode(tok))
+            return result.success(VarAccessNode(token))
 
-        elif tok.type == TOKEN_TYPE_LPAREN:
+        elif token.type == TOKEN_TYPE_LPAREN:
             # Parse (EXPR)
             result.register_advancement()  # Advance past the Left Parenthesis
             self.advance()
@@ -1511,7 +1511,7 @@ class Parser:
             if result.error:
                 return result
             # Closing Parenthesis
-            if self.current_tok.type == TOKEN_TYPE_RPAREN:
+            if self.current_token.type == TOKEN_TYPE_RPAREN:
                 # Advance past the Right Parenthesis
                 result.register_advancement()
                 self.advance()
@@ -1520,13 +1520,13 @@ class Parser:
             else:
                 return result.failure(
                     InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
+                        self.current_token.pos_start,
+                        self.current_token.pos_end,
                         c.ERRORS["rparen_expected"],
                     )
                 )
 
-        elif tok.type == TOKEN_TYPE_LSQUARE:
+        elif token.type == TOKEN_TYPE_LSQUARE:
             # Parse [EXPR, ...], []
             list_expr = result.register(
                 self.list_expr(in_a_function, in_a_loop)
@@ -1536,7 +1536,7 @@ class Parser:
             # Successful Parse
             return result.success(list_expr)
 
-        elif tok.matches(TOKEN_TYPE_KEYWORD, "IF"):
+        elif token.matches(TOKEN_TYPE_KEYWORD, "IF"):
             # Parse IF expression
             if_expr = result.register(self.if_expr(in_a_function, in_a_loop))
             if result.error:
@@ -1544,7 +1544,7 @@ class Parser:
             # Successful Parse
             return result.success(if_expr)
 
-        elif tok.matches(TOKEN_TYPE_KEYWORD, "FOR"):
+        elif token.matches(TOKEN_TYPE_KEYWORD, "FOR"):
             # Parse FOR expression
             # True indicates that a Loop is being parsed
             for_expr = result.register(self.for_expr(in_a_function, True))
@@ -1553,7 +1553,7 @@ class Parser:
             # Successful Parse
             return result.success(for_expr)
 
-        elif tok.matches(TOKEN_TYPE_KEYWORD, "WHILE"):
+        elif token.matches(TOKEN_TYPE_KEYWORD, "WHILE"):
             # Parse WHILE expression
             # True indicates that a Loop is being parsed
             while_expr = result.register(self.while_expr(in_a_function, True))
@@ -1562,7 +1562,7 @@ class Parser:
             # Successful Parse
             return result.success(while_expr)
 
-        elif tok.matches(TOKEN_TYPE_KEYWORD, "FUN"):
+        elif token.matches(TOKEN_TYPE_KEYWORD, "FUN"):
             # Parse FUN expression
             # True indicates that a Function Definition is being parsed
             func_def = result.register(self.func_def(True, in_a_loop))
@@ -1573,8 +1573,8 @@ class Parser:
 
         return result.failure(
             InvalidSyntaxError(
-                tok.pos_start,
-                tok.pos_end,
+                token.pos_start,
+                token.pos_end,
                 c.ERRORS["atom_syntax_error"],
             )
         )
@@ -1587,14 +1587,14 @@ class Parser:
         result = ParseResult()  # Initialise
         element_nodes = []
         # Record the beginning of the List
-        pos_start = self.current_tok.pos_start.copy()
+        pos_start = self.current_token.pos_start.copy()
 
         # This has to be a Left Bracket
-        if self.current_tok.type != TOKEN_TYPE_LSQUARE:
+        if self.current_token.type != TOKEN_TYPE_LSQUARE:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["lbracket_expected"],
                 )
             )
@@ -1602,14 +1602,14 @@ class Parser:
         result.register_advancement()  # Advance past the Left Bracket
         self.advance()
 
-        if self.current_tok.type == TOKEN_TYPE_RSQUARE:
+        if self.current_token.type == TOKEN_TYPE_RSQUARE:
             # This is an empty list []
             result.register_advancement()  # Advance past the Right Bracket
             self.advance()
             # Parsed an empty list i.e. []
             return result.success(
                                     ListNode(element_nodes, pos_start,
-                                             self.current_tok.pos_end.copy())
+                                             self.current_token.pos_end.copy())
             )
 
         # Parse a nonempty list [elem1, ...]
@@ -1619,14 +1619,14 @@ class Parser:
         if result.error:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["list_element_expected"],
                 )
             )
 
         # Optionally more EXPRs could follow preceded by a comma
-        while self.current_tok.type == TOKEN_TYPE_COMMA:
+        while self.current_token.type == TOKEN_TYPE_COMMA:
             result.register_advancement()  # Advance past ,
             self.advance()
 
@@ -1639,11 +1639,11 @@ class Parser:
                 return result
 
         # Parse Closing Bracket
-        if self.current_tok.type != TOKEN_TYPE_RSQUARE:
+        if self.current_token.type != TOKEN_TYPE_RSQUARE:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["comma_rbracket_expected"],
                 )
             )
@@ -1654,7 +1654,8 @@ class Parser:
 
         # Successful Parse
         return result.success(
-            ListNode(element_nodes, pos_start, self.current_tok.pos_end.copy())
+            ListNode(element_nodes, pos_start,
+                     self.current_token.pos_end.copy())
         )
 
     def if_expr(self, in_a_function, in_a_loop):
@@ -1752,11 +1753,11 @@ class Parser:
         result = ParseResult()  # Initialise
         else_case = None
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "ELSE"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "ELSE"):
             result.register_advancement()  # Advance past ELSE
             self.advance()
 
-            if self.current_tok.type == TOKEN_TYPE_NEWLINE:
+            if self.current_token.type == TOKEN_TYPE_NEWLINE:
                 # ELSE followed by a NL indicates a Multiline ELSE
                 else_case, error = self.parse_multiline_else(in_a_function,
                                                              in_a_loop,
@@ -1790,7 +1791,7 @@ class Parser:
         result = ParseResult()  # Initialise
         cases, else_case = [], None
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "ELIF"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "ELIF"):
             # Handle ELIF
             all_cases = result.register(
                 self.if_expr_b(in_a_function, in_a_loop)
@@ -1814,11 +1815,11 @@ class Parser:
         cases = []
         else_case = None
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, case_keyword):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, case_keyword):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     f"Expected '{case_keyword}'",
                 )
             )
@@ -1833,11 +1834,11 @@ class Parser:
         if result.error:
             return result
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "THEN"):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, "THEN"):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["then_expected"],
                 )
             )
@@ -1846,7 +1847,7 @@ class Parser:
         self.advance()
 
         # Multiline statements begin with a newline \n or ;
-        if self.current_tok.type == TOKEN_TYPE_NEWLINE:
+        if self.current_token.type == TOKEN_TYPE_NEWLINE:
             # THEN followed by a NL indicates Multiline IF/ELIF
             cases, else_case, error = (
                        self.parse_multiline_then(in_a_function,
@@ -1902,15 +1903,15 @@ class Parser:
         """
         else_case = (statements, True)
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "END"):
             result.register_advancement()  # Advance past END
             self.advance()
         else:
             return (None,
                     result.failure(
                                     InvalidSyntaxError(
-                                        self.current_tok.pos_start,
-                                        self.current_tok.pos_end,
+                                        self.current_token.pos_start,
+                                        self.current_token.pos_end,
                                         c.ERRORS["end_expected"],
                                     )
                                 )
@@ -1941,7 +1942,7 @@ class Parser:
         """
         cases.append((condition, statements, True))
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "END"):
             result.register_advancement()  # Advance past END
             self.advance()
         else:
@@ -1986,11 +1987,11 @@ class Parser:
         """
         result = ParseResult()  # Initialise
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "FOR"):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, "FOR"):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["for_expected"],
                 )
             )
@@ -1998,24 +1999,24 @@ class Parser:
         result.register_advancement()  # Advance past FOR
         self.advance()
 
-        if self.current_tok.type != TOKEN_TYPE_IDENTIFIER:
+        if self.current_token.type != TOKEN_TYPE_IDENTIFIER:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["identifier_expected"],
                 )
             )
 
-        var_name = self.current_tok
+        var_name = self.current_token
         result.register_advancement()  # Advance past the Identifier
         self.advance()
 
-        if self.current_tok.type != TOKEN_TYPE_ASSIGN:
+        if self.current_token.type != TOKEN_TYPE_ASSIGN:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["equal_expected"],
                 )
             )
@@ -2028,11 +2029,11 @@ class Parser:
         if result.error:
             return result
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "TO"):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, "TO"):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["to_expected"],
                 )
             )
@@ -2045,7 +2046,7 @@ class Parser:
         if result.error:
             return result
 
-        if self.current_tok.matches(TOKEN_TYPE_KEYWORD, "STEP"):
+        if self.current_token.matches(TOKEN_TYPE_KEYWORD, "STEP"):
             result.register_advancement()  # Advance past STEP
             self.advance()
 
@@ -2057,11 +2058,11 @@ class Parser:
             # This indicates that there is no STEP expression
             step_value = None
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "THEN"):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, "THEN"):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["then_expected"],
                 )
             )
@@ -2069,7 +2070,7 @@ class Parser:
         result.register_advancement()  # Advance past THEN
         self.advance()
 
-        if self.current_tok.type != TOKEN_TYPE_NEWLINE:
+        if self.current_token.type != TOKEN_TYPE_NEWLINE:
             # This is a single FOR expression - Parse it
             body = result.register(self.statement(in_a_function, in_a_loop))
             if result.error:
@@ -2095,11 +2096,11 @@ class Parser:
         if result.error:
             return result
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, "END"):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["end_expected"],
                 )
             )
@@ -2133,11 +2134,11 @@ class Parser:
         """
         result = ParseResult()  # Initialise
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "WHILE"):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, "WHILE"):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["while_expected"],
                 )
             )
@@ -2150,11 +2151,11 @@ class Parser:
         if result.error:
             return result
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "THEN"):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, "THEN"):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["then_expected"],
                 )
             )
@@ -2162,7 +2163,7 @@ class Parser:
         result.register_advancement()  # Advance past THEN
         self.advance()
 
-        if self.current_tok.type != TOKEN_TYPE_NEWLINE:
+        if self.current_token.type != TOKEN_TYPE_NEWLINE:
             # This is a single WHILE expression - Parse it
             body = result.register(self.statement(in_a_function, in_a_loop))
             if result.error:
@@ -2185,11 +2186,11 @@ class Parser:
         if result.error:
             return result
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, "END"):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["end_expected"],
                 )
             )
@@ -2225,11 +2226,11 @@ class Parser:
         """
         result = ParseResult()  # Initialise
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "FUN"):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, "FUN"):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["fun_expected"],
                 )
             )
@@ -2237,106 +2238,77 @@ class Parser:
         result.register_advancement()  # Advance past FUN
         self.advance()
 
-        if self.current_tok.type == TOKEN_TYPE_IDENTIFIER:
-            # Parse FUN function_name (parameter(s)) -> expr
-            var_name_tok = self.current_tok
+        if self.current_token.type == TOKEN_TYPE_IDENTIFIER:
+            # Parse FUN function_name followed by LPAREN
+            var_name_token = self.current_token
             result.register_advancement()  # Advance past the Identifier
             self.advance()
-            if self.current_tok.type != TOKEN_TYPE_LPAREN:
+            # Left Parenthesis must follow
+            if self.current_token.type != TOKEN_TYPE_LPAREN:
                 return result.failure(
                     InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
+                        self.current_token.pos_start,
+                        self.current_token.pos_end,
                         c.ERRORS["lparen_expected"],
                     )
                 )
         else:
-            # Parse anonymous function FUN (parameter(s)) -> expr
-            var_name_tok = None
-            if self.current_tok.type != TOKEN_TYPE_LPAREN:
+            # Parse anonymous function: FUN followed by LPAREN
+            var_name_token = None
+            # Left Parenthesis must follow
+            if self.current_token.type != TOKEN_TYPE_LPAREN:
                 return result.failure(
                     InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
+                        self.current_token.pos_start,
+                        self.current_token.pos_end,
                         c.ERRORS["identifier_lparen_expected"],
                     )
                 )
 
         result.register_advancement()  # Advance past the Opening Parenthesis
         self.advance()
-        arg_name_toks = []
+        param_name_tokens = []
 
-        if self.current_tok.type == TOKEN_TYPE_IDENTIFIER:
-            # Parse the first parameter
-            arg_name_toks.append(self.current_tok)
-            result.register_advancement()  # Advance past the Identifier
-            self.advance()
-
-            # Optionally more parameters could follow preceded by a comma
-            while self.current_tok.type == TOKEN_TYPE_COMMA:
-                result.register_advancement()  # Advance past ,
-                self.advance()
-
-                if self.current_tok.type != TOKEN_TYPE_IDENTIFIER:
-                    return result.failure(
+        # Either an identifier or a RPAREN must follow
+        if self.current_token.type == TOKEN_TYPE_IDENTIFIER:
+            pass
+        elif self.current_token.type != TOKEN_TYPE_RPAREN:
+            return result.failure(
                         InvalidSyntaxError(
-                            self.current_tok.pos_start,
-                            self.current_tok.pos_end,
-                            c.ERRORS["identifier_expected"],
+                            self.current_token.pos_start,
+                            self.current_token.pos_end,
+                            c.ERRORS["identifier_rparen_expected"],
                         )
-                    )
-
-                # Parse a parameter
-                arg_name_toks.append(self.current_tok)
-                result.register_advancement()  # Advance past the Identifier
-                self.advance()
-
-            if self.current_tok.type != TOKEN_TYPE_RPAREN:
-                return result.failure(
-                    InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
-                        c.ERRORS["comma_rparen_expected"],
-                    )
-                )
-        else:
-            if self.current_tok.type != TOKEN_TYPE_RPAREN:
-                return result.failure(
-                    InvalidSyntaxError(
-                        self.current_tok.pos_start,
-                        self.current_tok.pos_end,
-                        c.ERRORS["identifier_rparen_expected"],
-                    )
-                )
-
-        result.register_advancement()  # Advance past the Closing Parenthesis
-        self.advance()
-
-        if self.current_tok.type == TOKEN_TYPE_ARROW:
-            result.register_advancement()  # Advance past ->
-            self.advance()
-
-            # Parse the function definition's body
-            body = result.register(self.expr(in_a_function, in_a_loop))
-            if result.error:
-                return result
-
-            """
-            Successful Parse
-            'True' indicates that 'should_auto_return' is set to True
-            This means that this is an 'Arrow' function defined with ->
-            Such functions AUTOmatically return a value after execution
-            """
-
-            return result.success(
-                FuncDefNode(var_name_tok, arg_name_toks, body, True)
             )
 
-        if self.current_tok.type != TOKEN_TYPE_NEWLINE:
+        """
+        Parse the function's parameters if any
+        Upon completion, if it turns out to be an arrow function,
+        then complete the parsing of
+        the entire arrow function definition
+        """
+        tuple = self.parse_params_and_arrow(result,
+                                            var_name_token,
+                                            param_name_tokens)
+
+        (parsed_arrow, result,
+         param_name_tokens, error) = tuple
+
+        if error:
+            # An error occurred
+            return error
+
+        if parsed_arrow:
+            # An arrow function has been parsed successfully
+            return parsed_arrow
+
+        # At this stage, it must be a Multiline FUN definition
+        # Therefore, a NEWLINE token must follow
+        if self.current_token.type != TOKEN_TYPE_NEWLINE:
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["arrow_NL_expected"],
                 )
             )
@@ -2344,16 +2316,24 @@ class Parser:
         result.register_advancement()  # Advance past the NL
         self.advance()
 
-        # Parse the FUN's Multiline statements
-        body = result.register(self.statements(in_a_function, in_a_loop))
+        """
+        Parse the FUN's multiline definition's body
+        Since this is the body of a new function definition
+        Commence the Parsing with
+        in_a_function=True, in_a_loop=False
+        """
+        in_a_function = True
+        in_a_loop = False
+        body = result.register(self.statements(in_a_function,
+                                               in_a_loop))
         if result.error:
             return result
 
-        if not self.current_tok.matches(TOKEN_TYPE_KEYWORD, "END"):
+        if not self.current_token.matches(TOKEN_TYPE_KEYWORD, "END"):
             return result.failure(
                 InvalidSyntaxError(
-                    self.current_tok.pos_start,
-                    self.current_tok.pos_end,
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
                     c.ERRORS["end_expected"],
                 )
             )
@@ -2368,7 +2348,7 @@ class Parser:
         It acts more like a procedure.
         Therefore, there may be no return value at all!
         That is,
-        1) If thIS function executes a RETURN expr
+        1) If this function executes a RETURN expr
         the value of this expresson would be returned
         2) If this function executes a RETURN without an expr
         a None value of 0 will be returned viz. 'Number.none'
@@ -2378,8 +2358,115 @@ class Parser:
         """
 
         return result.success(
-            FuncDefNode(var_name_tok, arg_name_toks, body, False)
+            FuncDefNode(var_name_token, param_name_tokens, body,
+                        False)  # should_auto_return
         )
+
+    def parse_params_and_arrow(self, result,
+                               var_name_token, param_name_tokens):
+        """
+        Parse the function's parameters if any
+        Upon completion, if it turns out to be an arrow function,
+        e.g. (parameter(s)) -> expr OR () -> expr
+        then complete the parsing of
+        the entire arrow function definition
+
+        At this stage, pointing at the first parameter or at a RPAREN
+        """
+
+        if self.current_token.type == TOKEN_TYPE_RPAREN:
+            return self.checkfor_parse_arrow(result,
+                                             var_name_token,
+                                             param_name_tokens)
+
+        # Parse the first parameter
+        param_name_tokens.append(self.current_token)
+        result.register_advancement()  # Advance past the Identifier
+        self.advance()
+
+        # Optionally more parameters could follow preceded by a comma
+        while self.current_token.type == TOKEN_TYPE_COMMA:
+            result.register_advancement()  # Advance past ,
+            self.advance()
+
+            if self.current_token.type != TOKEN_TYPE_IDENTIFIER:
+                error = result.failure(
+                            InvalidSyntaxError(
+                                self.current_token.pos_start,
+                                self.current_token.pos_end,
+                                c.ERRORS["identifier_expected"],
+                            )
+                )
+                return None, None, [], error
+
+            # Parse a parameter
+            param_name_tokens.append(self.current_token)  # TODO
+            result.register_advancement()  # Advance past the Identifier
+            self.advance()
+
+        if self.current_token.type != TOKEN_TYPE_RPAREN:
+            error = result.failure(
+                        InvalidSyntaxError(
+                            self.current_token.pos_start,
+                            self.current_token.pos_end,
+                            c.ERRORS["comma_rparen_expected"],
+                        )
+            )
+            return None, None, [], error
+
+        return self.checkfor_parse_arrow(result,
+                                         var_name_token,
+                                         param_name_tokens)
+
+    def checkfor_parse_arrow(self, result,
+                             var_name_token, param_name_tokens):
+        """
+        Check to see if this is an arrow function
+        If so, complete the parsing of
+        the entire arrow function definition
+
+        At this stage, pointing at the right parenthesis
+        """
+
+        # Advance past the Closing Right Parenthesis
+        result.register_advancement()
+        self.advance()
+
+        if self.current_token.type != TOKEN_TYPE_ARROW:
+            # Not an Arrow Function therefore must be
+            # a Multiline definition
+            # The first 'None' indicates that this is NOT an arrow function!
+            return None, result, param_name_tokens, None
+
+        result.register_advancement()  # Advance past ->
+        self.advance()
+
+        """
+        Parse the arrow function definition's body
+        Since this is the body of a new function definition
+        Commence the Parsing with
+        in_a_function=True, in_a_loop=False
+        """
+        body = result.register(self.expr(True, False))
+        if result.error:
+            return None, None, [], result
+
+        """
+        Successful Parse
+        'True' indicates that 'should_auto_return' is set to True
+        This means that this is an 'Arrow' function defined with ->
+        Such functions AUTOmatically return a value after execution
+        """
+
+        parsed_arrow = result.success(
+                                FuncDefNode(var_name_token,
+                                            param_name_tokens,
+                                            body,
+                                            True)  # should_auto_return
+        )
+
+        # This IS an arrow function!
+        return parsed_arrow, result, param_name_tokens, None
 
     ###################################
 
@@ -2393,10 +2480,10 @@ class Parser:
             return result
 
         while (
-            self.current_tok.type in ops
-            or (self.current_tok.type, self.current_tok.value) in ops
+            self.current_token.type in ops
+            or (self.current_token.type, self.current_token.value) in ops
         ):
-            operator_token = self.current_tok
+            operator_token = self.current_token
             result.register_advancement()  # Advance past the Operator Token
             self.advance()
             right = result.register(func_b(in_a_function, in_a_loop))
@@ -3338,14 +3425,14 @@ class Interpreter:
 
     def visit_NumberNode(self, node, context):
         return RTResult().success(
-            Number(node.tok.value)
+            Number(node.token.value)
             .set_context(context)
             .set_pos(node.pos_start, node.pos_end)
         )
 
     def visit_StringNode(self, node, context):
         return RTResult().success(
-            String(node.tok.value)
+            String(node.token.value)
             .set_context(context)
             .set_pos(node.pos_start, node.pos_end)
         )
@@ -3646,7 +3733,7 @@ class Interpreter:
         # Determine 'func_name' depending on whether the function is anonymous
         func_name = node.var_name_tok.value if node.var_name_tok else None
         body_node = node.body_node
-        arg_names = [arg_name.value for arg_name in node.arg_name_toks]
+        arg_names = [arg_name.value for arg_name in node.arg_name_tokens]
         func_value = (
             Function(func_name, body_node, arg_names, node.should_auto_return)
             .set_context(context)
