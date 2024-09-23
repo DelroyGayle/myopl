@@ -2379,8 +2379,26 @@ class Parser:
                                              var_name_token,
                                              param_name_tokens)
 
+        # This list will have the actual parameter names so that
+        # a check can be verified that there are no duplicates
+        names_list = []
+        # This is the current function name so that
+        # a check can be verified that there are no duplicates
+        function_name = var_name_token.value
+
         # Parse the first parameter
         param_name_tokens.append(self.current_token)
+        names_list.append(self.current_token.value)
+
+        """
+        Check whether the function name
+        has been used as a parameter name as well
+        """
+        if (error := self.duplicate_function_name(function_name,
+                                                  names_list,
+                                                  result)):
+            return error
+
         result.register_advancement()  # Advance past the Identifier
         self.advance()
 
@@ -2399,8 +2417,25 @@ class Parser:
                 )
                 return None, None, [], error
 
-            # Parse a parameter
-            param_name_tokens.append(self.current_token)  # TODO
+            # Parse a parameter - Check for duplicates
+            if self.current_token.value in names_list:
+                error = result.failure(
+                    InvalidSyntaxError(
+                        self.current_token.pos_start,
+                        self.current_token.pos_end,
+                        (f"Duplicate parameter '{self.current_token.value}' "
+                         "in function definition"),
+                    )
+                )
+                return None, None, [], error
+
+            param_name_tokens.append(self.current_token)
+            names_list.append(self.current_token.value)
+            # Check if the function name has already been used
+            if (error := self.duplicate_function_name(function_name,
+                                                      names_list, result)):
+                return error
+
             result.register_advancement()  # Advance past the Identifier
             self.advance()
 
@@ -2467,6 +2502,25 @@ class Parser:
 
         # This IS an arrow function!
         return parsed_arrow, result, param_name_tokens, None
+
+    def duplicate_function_name(self, function_name, names_list, result):
+        """
+        Check whether the function name
+        has been used as a parameter name as well
+        """
+
+        # Parse a parameter - Check for duplicates
+        if function_name in names_list:
+            error = result.failure(
+                InvalidSyntaxError(
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
+                    (f"Duplicate parameter '{function_name}'. "
+                     "A parameter cannot share the same name "
+                     "as the function name"),
+                )
+            )
+            return None, None, [], error
 
     ###################################
 
@@ -2543,7 +2597,7 @@ class RTResult:
         return self
 
     def should_return(self):
-        # Note: this will allow you to 'continue' a loop and
+        # Note: this will enable to 'continue' a loop and
         # 'break' a loop as well as
         # 'break' outside the current function
         return (
@@ -2959,16 +3013,21 @@ class BaseFunction(Value):
         return super().set_context(context)
 
     def generate_new_context(self):
+        """This code enables true function closures"""
         new_context = Context(self.name, self.context, self.pos_start)
         new_context.symbol_table = SymbolTable(new_context.parent.symbol_table)
         return new_context
 
-    def check_args(self, arg_names, args):
+    def check_params(self, param_names, args):
+        """
+        Ensure that the number of parameters matches
+        the function call's number of arguments
+        """
         result = RTResult()  # initialise
 
-        if len(args) > len(arg_names):
+        if len(args) > len(param_names):
             errormess = (
-                f"{len(args) - len(arg_names)} too many args "
+                f"{len(args) - len(param_names)} too many args "
                 f"passed into {self}"
             )
             return result.failure(
@@ -2980,9 +3039,9 @@ class BaseFunction(Value):
                 )
             )
 
-        if len(args) < len(arg_names):
+        if len(args) < len(param_names):
             errormess = (
-                f"{len(arg_names) - len(args)} too few args "
+                f"{len(param_names) - len(args)} too few args "
                 f"passed into {self}"
             )
             return result.failure(
@@ -2996,24 +3055,29 @@ class BaseFunction(Value):
 
         return result.success(None)
 
-    def populate_args(self, arg_names, args, execution_context):
+    def populate_params(self, param_names, args, execution_context):
+        """Populate each parameter with its corresponding value"""
         for i in range(len(args)):
-            arg_name = arg_names[i]
-            arg_value = args[i]
-            arg_value.set_context(execution_context)
-            execution_context.symbol_table.set(arg_name, arg_value)
+            param_name = param_names[i]
+            param_value = args[i]
+            param_value.set_context(execution_context)
+            execution_context.symbol_table.set(param_name, param_value)
 
-    def check_and_populate_args(self, arg_names, args, execution_context):
+    def check_and_populate_params(self, param_names, args, execution_context):
+        """
+        If the number of parameters and arguments match,
+        then populate each parameter
+        """
         result = RTResult()  # initialise
         # Check that the number of parameters
         # and the number of arguments match
-        result.register(self.check_args(arg_names, args))
+        result.register(self.check_params(param_names, args))
         if result.should_return():
             # Error occurred i.e. the numbers don't match!
             return result
 
-        # Populate the arguments with their corresponding values
-        self.populate_args(arg_names, args, execution_context)
+        # Populate the parameters with their corresponding values
+        self.populate_params(param_names, args, execution_context)
         return result.success(None)
 
 
@@ -3030,8 +3094,9 @@ class Function(BaseFunction):
         execution_context = self.generate_new_context()
 
         # Perform initial checks such as matching number of args
+        # If checks are successful, populate parameters
         result.register(
-            self.check_and_populate_args(
+            self.check_and_populate_params(
                 self.arg_names, args, execution_context
             )
         )
@@ -3052,8 +3117,10 @@ class Function(BaseFunction):
         """
         Determine the 'return value'
         If 'self.should_auto_return' is true:
+            This is an arrow function therefore
             set ret_value to whatever value is in 'thevalue'
         else:
+            Multiline FUN
             set ret_value to Number.none
 
         However if after this assignment, 'ret_value' is falsy:
@@ -3094,16 +3161,19 @@ class BuiltInFunction(BaseFunction):
         method = getattr(self, method_name, self.no_visit_method)
 
         result.register(
-            self.check_and_populate_args(
+            self.check_and_populate_params(
                 method.arg_names, args, execution_context
             )
         )
         if result.should_return():
+            # An error has occurred
             return result
 
         return_value = result.register(method(execution_context))
         if result.should_return():
+            # Either error, BREAK, CONTINUE or RETURN
             return result
+
         return result.success(return_value)
 
     def no_visit_method(self, node, context):
@@ -3444,7 +3514,6 @@ class Interpreter:
         for element_node in node.element_nodes:
             elements.append(result.register(self.visit(element_node, context)))
             if result.should_return():
-                # An error has occurred
                 return result
 
         # List successfully created
@@ -3481,7 +3550,6 @@ class Interpreter:
         var_name = node.var_name_tok.value
         value = result.register(self.visit(node.value_node, context))
         if result.should_return():
-            # An error has occurred whilst trying to determine this variable
             return result
 
         # Set the variable to this value i.e. VAR = VALUE
@@ -3492,11 +3560,9 @@ class Interpreter:
         result = RTResult()  # Initialise
         left = result.register(self.visit(node.left_node, context))
         if result.should_return():
-            # An error has occurred
             return result
         right = result.register(self.visit(node.right_node, context))
         if result.should_return():
-            # An error has occurred
             return result
 
         if node.operator_token.type == TOKEN_TYPE_PLUS:
@@ -3539,7 +3605,6 @@ class Interpreter:
         result = RTResult()  # Initialise
         number = result.register(self.visit(node.node, context))
         if result.should_return():
-            # An error has occurred
             return result
 
         error = None
@@ -3731,6 +3796,7 @@ class Interpreter:
         result = RTResult()  # Initialise
 
         # Determine 'func_name' depending on whether the function is anonymous
+        # The 'None' value indicates an anonymous function
         func_name = node.var_name_tok.value if node.var_name_tok else None
         body_node = node.body_node
         arg_names = [arg_name.value for arg_name in node.arg_name_tokens]
