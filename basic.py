@@ -6,6 +6,7 @@ import os
 import math
 import misc
 import constants as c
+from typing import Union, Any, Self, Optional
 
 #######################################
 # ERRORS
@@ -13,13 +14,15 @@ import constants as c
 
 
 class Error:
-    def __init__(self, pos_start, pos_end, error_name, details):
+    def __init__(
+        self, pos_start: int, pos_end: int, error_name: str, details: str
+    ) -> None:
         self.pos_start = pos_start
         self.pos_end = pos_end
         self.error_name = error_name
         self.details = details
 
-    def as_string(self):
+    def as_string(self) -> str:
         """Traceback Result"""
         result = f"{self.error_name}: {self.details}\n\n"
         result += (
@@ -33,26 +36,30 @@ class Error:
 
 
 class IllegalCharError(Error):
-    def __init__(self, pos_start, pos_end, details):
+    def __init__(self, pos_start: int, pos_end: int, details: str) -> None:
         super().__init__(pos_start, pos_end, "Illegal Character", details)
 
 
 class ExpectedCharError(Error):
-    def __init__(self, pos_start, pos_end, details):
+    def __init__(self, pos_start: int, pos_end: int, details: str) -> None:
         super().__init__(pos_start, pos_end, "Expected Character", details)
 
 
 class InvalidSyntaxError(Error):
-    def __init__(self, pos_start, pos_end, details=""):
+    def __init__(
+        self, pos_start: int, pos_end: int, details: str = ""
+    ) -> None:
         super().__init__(pos_start, pos_end, "Invalid Syntax", details)
 
 
 class RTError(Error):
-    def __init__(self, pos_start, pos_end, details, context):
+    def __init__(
+        self, pos_start: int, pos_end: int, details: str, context: Any
+    ) -> None:
         super().__init__(pos_start, pos_end, "Runtime Error", details)
         self.context = context
 
-    def as_string(self):
+    def as_string(self) -> str:
         result = self.generate_traceback()
         result += f"{self.error_name}: {self.details}"
         result += "\n\n" + misc.string_with_arrows(
@@ -60,7 +67,7 @@ class RTError(Error):
         )
         return result
 
-    def generate_traceback(self):
+    def generate_traceback(self) -> str:
         result = ""
         pos = self.pos_start
         context = self.context
@@ -86,14 +93,21 @@ class RTError(Error):
 
 
 class Position:
-    def __init__(self, theindex, linenum, column, filename, filetext):
+    def __init__(
+        self,
+        theindex: int,
+        linenum: int,
+        column: int,
+        filename: str,
+        filetext: str,
+    ) -> None:
         self.theindex = theindex
         self.linenum = linenum
         self.column = column
         self.filename = filename
         self.filetext = filetext
 
-    def advance(self, current_char=None):
+    def advance(self, current_char: Optional[str] = None) -> Self:
         """Advance the position by 1"""
         self.theindex += 1
         self.column += 1
@@ -104,7 +118,7 @@ class Position:
 
         return self
 
-    def copy(self):
+    def copy(self) -> Self:
         return Position(
             self.theindex,
             self.linenum,
@@ -146,13 +160,13 @@ TOKEN_TYPE_NEWLINE = "NEWLINE"
 TOKEN_TYPE_EOF = "EOF"
 
 COMPARISONS_TOKEN = (
-                    TOKEN_TYPE_EQUAL_TO,
-                    TOKEN_TYPE_NOT_EQUAL_TO,
-                    TOKEN_TYPE_LESS_THAN,
-                    TOKEN_TYPE_GREATER_THAN,
-                    TOKEN_TYPE_LESS_THAN_EQUAL_TO,
-                    TOKEN_TYPE_GREATER_THAN_EQUAL_TO,
-                )
+    TOKEN_TYPE_EQUAL_TO,
+    TOKEN_TYPE_NOT_EQUAL_TO,
+    TOKEN_TYPE_LESS_THAN,
+    TOKEN_TYPE_GREATER_THAN,
+    TOKEN_TYPE_LESS_THAN_EQUAL_TO,
+    TOKEN_TYPE_GREATER_THAN_EQUAL_TO,
+)
 
 KEYWORDS = [
     "VAR",
@@ -177,7 +191,13 @@ KEYWORDS = [
 
 
 class Token:
-    def __init__(self, token_type, value=None, pos_start=None, pos_end=None):
+    def __init__(
+        self,
+        token_type: str,
+        value: Optional[str] = None,
+        pos_start: Optional[int] = None,
+        pos_end: Optional[int] = None,
+    ) -> None:
         self.type = token_type
         self.value = value
 
@@ -189,11 +209,11 @@ class Token:
         if pos_end:
             self.pos_end = pos_end.copy()
 
-    def matches(self, token_type, value):
+    def matches(self, token_type: str, value: str) -> bool:
         """Does the token match the value?"""
         return self.type == token_type and self.value == value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.value:
             return f"{self.type}:{self.value}"
         return f"{self.type}"
@@ -205,14 +225,14 @@ class Token:
 
 
 class Lexer:
-    def __init__(self, filename, text):
+    def __init__(self, filename: str, text: str) -> None:
         self.filename = filename
         self.text = text
         self.pos = Position(-1, 0, -1, filename, text)
         self.current_char = None
         self.advance()
 
-    def advance(self):
+    def advance(self) -> tuple:
         self.pos.advance(self.current_char)
         self.current_char = (
             self.text[self.pos.theindex]
@@ -220,7 +240,7 @@ class Lexer:
             else None
         )
 
-    def make_tokens(self):
+    def make_tokens(self) -> tuple:
         """Create a list of 'TOKENS'"""
         tokens = []
 
@@ -309,7 +329,7 @@ class Lexer:
         tokens.append(Token(TOKEN_TYPE_EOF, pos_start=self.pos))
         return tokens, None
 
-    def make_exponent_number(self, num_str, pos_start):
+    def make_exponent_number(self, num_str: str, pos_start: int) -> tuple:
         """
         An 'e' has been detected so at this point
         parse a floating point number which uses exponential notation
@@ -370,7 +390,7 @@ class Lexer:
                 ),
             )
 
-    def make_number(self):
+    def make_number(self) -> tuple:
         """Parse a Number"""
         num_str = ""
         dot_count = 0
@@ -436,7 +456,7 @@ class Lexer:
                 ),
             )
 
-    def make_string(self):
+    def make_string(self) -> tuple:
         """Parse a String"""
         string = ""
         pos_start = self.pos.copy()
@@ -482,7 +502,7 @@ class Lexer:
         self.advance()
         return Token(TOKEN_TYPE_STRING, string, pos_start, self.pos), None
 
-    def handle_hex_value(self, pos_start):
+    def handle_hex_value(self, pos_start: int) -> tuple:
         """
         Process escaped hex values
         Note: there must be TWO hexadecimal characters
@@ -502,7 +522,7 @@ class Lexer:
 
         return chr(int(char1, 16) * 16 + int(char2, 16)), None
 
-    def check_the_char(self, pos_start):
+    def check_the_char(self, pos_start: int) -> tuple:
         if self.current_char is None:
             # Unterminated string
             return (
@@ -524,7 +544,7 @@ class Lexer:
 
         return self.current_char, None
 
-    def make_identifier(self):
+    def make_identifier(self) -> Token:
         """Parse an Identifier"""
         id_str = ""
         pos_start = self.pos.copy()
@@ -541,7 +561,7 @@ class Lexer:
         )
         return Token(tok_type, id_str, pos_start, self.pos)
 
-    def make_minus_or_arrow(self):
+    def make_minus_or_arrow(self) -> Token:
         """Parse ->"""
         tok_type = TOKEN_TYPE_MINUS
         pos_start = self.pos.copy()
@@ -553,7 +573,7 @@ class Lexer:
 
         return Token(tok_type, pos_start=pos_start, pos_end=self.pos)
 
-    def make_not_equals(self):
+    def make_not_equals(self) -> tuple:
         """Parse !="""
         pos_start = self.pos.copy()
         self.advance()
@@ -573,7 +593,7 @@ class Lexer:
         self.advance()
         return None, ExpectedCharError(pos_start, self.pos, "'=' (after '!')")
 
-    def make_equals(self):
+    def make_equals(self) -> Token:
         """Parse = or =="""
         tok_type = TOKEN_TYPE_ASSIGN
         pos_start = self.pos.copy()
@@ -587,7 +607,7 @@ class Lexer:
         # =
         return Token(tok_type, pos_start=pos_start, pos_end=self.pos)
 
-    def make_less_than(self):
+    def make_less_than(self) -> Token:
         """Parse < or <="""
         tok_type = TOKEN_TYPE_LESS_THAN
         pos_start = self.pos.copy()
@@ -601,7 +621,7 @@ class Lexer:
         # <
         return Token(tok_type, pos_start=pos_start, pos_end=self.pos)
 
-    def make_greater_than(self):
+    def make_greater_than(self) -> Token:
         """Parse > or >="""
         tok_type = TOKEN_TYPE_GREATER_THAN
         pos_start = self.pos.copy()
@@ -615,7 +635,7 @@ class Lexer:
         # >
         return Token(tok_type, pos_start=pos_start, pos_end=self.pos)
 
-    def skip_comment(self):
+    def skip_comment(self) -> tuple:
         """
         Single line comments begin with a #
         # ....
@@ -674,31 +694,33 @@ class Lexer:
 
 
 class NumberNode:
-    def __init__(self, token):
+    def __init__(self, token: Token) -> None:
         self.token = token
 
         self.pos_start = self.token.pos_start
         self.pos_end = self.token.pos_end
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.token}"
 
 
 class StringNode:
-    def __init__(self, token):
+    def __init__(self, token: Token) -> None:
         self.token = token
 
         self.pos_start = self.token.pos_start
         self.pos_end = self.token.pos_end
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.token}"
 
 
 class ListNode:
     """Generate 'element_nodes' which will be a list of Nodes"""
 
-    def __init__(self, element_nodes, pos_start, pos_end):
+    def __init__(
+        self, element_nodes: list, pos_start: int, pos_end: int
+    ) -> None:
         self.element_nodes = element_nodes
 
         self.pos_start = pos_start
@@ -706,25 +728,27 @@ class ListNode:
 
 
 class VarAccessNode:
-    def __init__(self, var_name_tok):
-        self.var_name_tok = var_name_tok
+    def __init__(self, var_name_token: Token) -> None:
+        self.var_name_token = var_name_token
 
-        self.pos_start = self.var_name_tok.pos_start
-        self.pos_end = self.var_name_tok.pos_end
+        self.pos_start = self.var_name_token.pos_start
+        self.pos_end = self.var_name_token.pos_end
 
 
 class VarAssignNode:
-    def __init__(self, var_name_tok, value_node):
-        self.var_name_tok = var_name_tok
+    def __init__(self, var_name_token: Token, value_node: Any) -> None:
+        self.var_name_token = var_name_token
         self.value_node = value_node
 
-        self.pos_start = self.var_name_tok.pos_start
+        self.pos_start = self.var_name_token.pos_start
         # Record the end of the Assignment Expression
         self.pos_end = self.value_node.pos_end
 
 
 class BinOpNode:
-    def __init__(self, left_node, operator_token, right_node):
+    def __init__(
+        self, left_node: Any, operator_token: Token, right_node: Any
+    ) -> None:
         self.left_node = left_node
         self.operator_token = operator_token
         self.right_node = right_node
@@ -734,12 +758,12 @@ class BinOpNode:
         # Record the end of the Right Expression
         self.pos_end = self.right_node.pos_end
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"({self.left_node}, {self.operator_token}, {self.right_node})"
 
 
 class UnaryOpNode:
-    def __init__(self, operator_token, node):
+    def __init__(self, operator_token: Token, node: Any) -> None:
         self.operator_token = operator_token
         self.node = node
 
@@ -747,14 +771,14 @@ class UnaryOpNode:
         # Record the end of the Unary Expression
         self.pos_end = node.pos_end
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"({self.operator_token}, {self.node})"
 
 
 class IfNode:
     """Handle IF ... ELIF ... ELSE"""
 
-    def __init__(self, cases, else_case):
+    def __init__(self, cases: list, else_case: Any) -> None:
         self.cases = cases
         self.else_case = else_case
 
@@ -773,14 +797,14 @@ class IfNode:
 class ForNode:
     def __init__(
         self,
-        var_name_tok,
-        start_value_node,
-        end_value_node,
-        step_value_node,
-        body_node,
-        should_return_none,
-    ):
-        self.var_name_tok = var_name_tok
+        var_name_token: Token,
+        start_value_node: Any,
+        end_value_node: Any,
+        step_value_node: Any,
+        body_node: Any,
+        should_return_none: bool,
+    ) -> None:
+        self.var_name_token = var_name_token
         self.start_value_node = start_value_node
         self.end_value_node = end_value_node
         self.step_value_node = step_value_node
@@ -788,13 +812,15 @@ class ForNode:
         self.should_return_none = should_return_none
 
         # Record the beginning of the FOR Expression
-        self.pos_start = self.var_name_tok.pos_start
+        self.pos_start = self.var_name_token.pos_start
         # Record the end of the body of the FOR Expression
         self.pos_end = self.body_node.pos_end
 
 
 class WhileNode:
-    def __init__(self, condition_node, body_node, should_return_none):
+    def __init__(
+        self, condition_node: Any, body_node: Any, should_return_none: bool
+    ) -> None:
         self.condition_node = condition_node
         self.body_node = body_node
         self.should_return_none = should_return_none
@@ -807,16 +833,20 @@ class WhileNode:
 
 class FuncDefNode:
     def __init__(
-        self, var_name_tok, arg_name_tokens, body_node, should_auto_return
-    ):
-        self.var_name_tok = var_name_tok
+        self,
+        var_name_token: Token,
+        arg_name_tokens: list[Token],
+        body_node: Any,
+        should_auto_return: bool,
+    ) -> None:
+        self.var_name_token = var_name_token
         self.arg_name_tokens = arg_name_tokens
         self.body_node = body_node
         self.should_auto_return = should_auto_return
 
-        if self.var_name_tok:
+        if self.var_name_token:
             # This FUN has a name - record its position
-            self.pos_start = self.var_name_tok.pos_start
+            self.pos_start = self.var_name_token.pos_start
         elif len(self.arg_name_tokens) > 0:
             # Anonymous FUN - record the beginning of the FIRST Arg
             self.pos_start = self.arg_name_tokens[0].pos_start
@@ -831,7 +861,7 @@ class FuncDefNode:
 
 class CallNode:
     # Handle the CALLing of a Function
-    def __init__(self, node_to_call, arg_nodes):
+    def __init__(self, node_to_call: Any, arg_nodes: list) -> None:
         self.node_to_call = node_to_call
         self.arg_nodes = arg_nodes
 
@@ -847,7 +877,9 @@ class CallNode:
 
 
 class ReturnNode:
-    def __init__(self, node_to_return, pos_start, pos_end):
+    def __init__(
+        self, node_to_return: Any, pos_start: int, pos_end: int
+    ) -> None:
         """
         This node represents the Return Value
         'node_to_return' will have the value of 'None'
@@ -860,19 +892,19 @@ class ReturnNode:
 
 
 class ContinueNode:
-    def __init__(self, pos_start, pos_end):
+    def __init__(self, pos_start: int, pos_end: int) -> None:
         self.pos_start = pos_start
         self.pos_end = pos_end
 
 
 class BreakNode:
-    def __init__(self, pos_start, pos_end):
+    def __init__(self, pos_start: int, pos_end: int) -> None:
         self.pos_start = pos_start
         self.pos_end = pos_end
 
 
 class ImportNode:
-    def __init__(self, string_node, pos_start, pos_end):
+    def __init__(self, string_node: Any, pos_start: int, pos_end: int) -> None:
         self.string_node = string_node
         self.pos_start = pos_start
         self.pos_end = pos_end
@@ -887,19 +919,19 @@ class ImportNode:
 
 
 class ParseResult:
-    def __init__(self):
+    def __init__(self) -> None:
         self.error = None
         self.node = None
         self.last_registered_advance_count = 0
         self.advance_count = 0
         self.to_reverse_count = 0
 
-    def register_advancement(self):
+    def register_advancement(self) -> None:
         # Advance By One Token
         self.last_registered_advance_count = 1
         self.advance_count += 1
 
-    def register(self, result):
+    def register(self, result: Any) -> Any:
         """
         Make a note of the current number of tokens
         before an advancement is made
@@ -916,7 +948,7 @@ class ParseResult:
             self.error = result.error
         return result.node
 
-    def try_register(self, result):
+    def try_register(self, result: Any) -> Any:
         if result.error:
             """
             An error has occurred therefore
@@ -931,12 +963,12 @@ class ParseResult:
         # No error occurred - proceed forward
         return self.register(result)
 
-    def success(self, node):
+    def success(self, node: Any) -> Self:
         # No errors
         self.node = node
         return self
 
-    def failure(self, error):
+    def failure(self, error: Any) -> Self:
         """
         An error has occurred
         If no error has been previously registered then
@@ -954,21 +986,21 @@ class ParseResult:
 
 
 class Parser:
-    def __init__(self, tokens):
+    def __init__(self, tokens: list) -> None:
         self.tokens = tokens
         # After the first advancement the value will be 0
         self.token_index = -1
         # Process the initial token
         self.advance()
 
-    def advance(self):
+    def advance(self) -> Token:
         """Advance by One Token"""
         self.token_index += 1
         self.update_current_tok()
         # Return new token
         return self.current_token
 
-    def reverse(self, amount=1):
+    def reverse(self, amount: int = 1) -> Token:
         """
         An error has occurred therefore go
         back to the previous token position
@@ -980,12 +1012,12 @@ class Parser:
         self.update_current_tok()
         return self.current_token
 
-    def update_current_tok(self):
+    def update_current_tok(self) -> None:
         """Fetch Next Token"""
         if self.token_index >= 0 and self.token_index < len(self.tokens):
             self.current_token = self.tokens[self.token_index]
 
-    def parse(self):
+    def parse(self) -> Any:
         """
         Commence the Parsing of all the tokens produced by the Lexer
         Begin with
@@ -1010,7 +1042,7 @@ class Parser:
 
     ###################################
 
-    def statements(self, in_a_function, in_a_loop):
+    def statements(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """Parse a list of statements. Minimum: One Statement"""
 
         result = ParseResult()  # Initialise
@@ -1043,7 +1075,7 @@ class Parser:
             ListNode(statements, pos_start, self.current_token.pos_end.copy())
         )
 
-    def statement(self, in_a_function, in_a_loop):
+    def statement(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """Parse a single statement"""
 
         result = ParseResult()  # Initialise
@@ -1080,12 +1112,14 @@ class Parser:
         # Successful Parse
         return result.success(expression)
 
-    def parse_any_additional_statements(self,
-                                        in_a_function,
-                                        in_a_loop,
-                                        statements,
-                                        result):
-        """ Check for any further optional statements and parse them """
+    def parse_any_additional_statements(
+        self,
+        in_a_function: bool,
+        in_a_loop: bool,
+        statements: list,
+        result: ParseResult,
+    ) -> ParseResult:
+        """Check for any further optional statements and parse them"""
 
         more_statements = True
 
@@ -1138,7 +1172,13 @@ class Parser:
 
         return statements, result
 
-    def parse_return(self, in_a_function, in_a_loop, result, pos_start):
+    def parse_return(
+        self,
+        in_a_function: bool,
+        in_a_loop: bool,
+        result: ParseResult,
+        pos_start: int,
+    ) -> ParseResult:
         """Parse the RETURN statement"""
 
         result.register_advancement()  # Advance past RETURN
@@ -1171,7 +1211,9 @@ class Parser:
             )
         )
 
-    def parse_continue(self, in_a_loop, result, pos_start):
+    def parse_continue(
+        self, in_a_loop: bool, result: ParseResult, pos_start: int
+    ) -> ParseResult:
         """Parse the CONTINUE statement"""
 
         result.register_advancement()  # Advance past CONTINUE
@@ -1192,7 +1234,9 @@ class Parser:
             ContinueNode(pos_start, self.current_token.pos_start.copy())
         )
 
-    def parse_break(self, in_a_loop, result, pos_start):
+    def parse_break(
+        self, in_a_loop: bool, result: ParseResult, pos_start: int
+    ) -> ParseResult:
         """Parse the BREAK statement"""
 
         result.register_advancement()  # Advance past BREAK
@@ -1213,7 +1257,13 @@ class Parser:
             BreakNode(pos_start, self.current_token.pos_start.copy())
         )
 
-    def parse_import(self, in_a_function, in_a_loop, result, pos_start):
+    def parse_import(
+        self,
+        in_a_function: bool,
+        in_a_loop: bool,
+        result: ParseResult,
+        pos_start: int,
+    ) -> ParseResult:
         """Parse the IMPORT <STRING> statement"""
 
         result.register_advancement()  # Advance past IMPORT
@@ -1235,16 +1285,16 @@ class Parser:
             ImportNode(string, pos_start, self.current_token.pos_start.copy())
         )
 
-    def expr(self, in_a_function, in_a_loop):
+    def expr(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """Parse a Single Expression"""
 
         result = ParseResult()  # Initialise
 
         if self.current_token.matches(TOKEN_TYPE_KEYWORD, "VAR"):
             # Parse VAR identifier = EXPR
-            return self.parse_variable_assignment(in_a_function,
-                                                  in_a_loop,
-                                                  result)
+            return self.parse_variable_assignment(
+                in_a_function, in_a_loop, result
+            )
 
         # Parse a non-assignment expression
         # This will always be a bin_op Binary Operation
@@ -1269,7 +1319,9 @@ class Parser:
         # Successful Parse
         return result.success(node)
 
-    def parse_variable_assignment(self, in_a_function, in_a_loop, result):
+    def parse_variable_assignment(
+        self, in_a_function: bool, in_a_loop: bool, result: ParseResult
+    ) -> ParseResult:
         """Parse VAR identifier = EXPR"""
 
         result.register_advancement()  # Advance past VAR
@@ -1311,7 +1363,7 @@ class Parser:
         # Successful Parse
         return result.success(VarAssignNode(var_name, expression))
 
-    def comp_expr(self, in_a_function, in_a_loop):
+    def comp_expr(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """Parse a Comparison Expression"""
 
         result = ParseResult()  # Initialise
@@ -1351,7 +1403,7 @@ class Parser:
         # Successful Parse
         return result.success(node)
 
-    def arith_expr(self, in_a_function, in_a_loop):
+    def arith_expr(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """Parse X + Y or X - Y"""
         return self.bin_op(
             in_a_function,
@@ -1360,7 +1412,7 @@ class Parser:
             (TOKEN_TYPE_PLUS, TOKEN_TYPE_MINUS),
         )
 
-    def term(self, in_a_function, in_a_loop):
+    def term(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """Parse X * Y or X / Y or X % Y"""
         return self.bin_op(
             in_a_function,
@@ -1369,7 +1421,7 @@ class Parser:
             (TOKEN_TYPE_MULTIPLY, TOKEN_TYPE_DIVIDE, TOKEN_TYPE_MODULUS),
         )
 
-    def factor(self, in_a_function, in_a_loop):
+    def factor(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """Parse +X or -X"""
         result = ParseResult()  # Initialise
         token = self.current_token
@@ -1386,7 +1438,7 @@ class Parser:
 
         return self.power(in_a_function, in_a_loop)
 
-    def power(self, in_a_function, in_a_loop):
+    def power(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """Parse x^y"""
         return self.bin_op(
             in_a_function,
@@ -1396,7 +1448,7 @@ class Parser:
             self.factor,
         )
 
-    def call(self, in_a_function, in_a_loop):
+    def call(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """
         Parse function_call(x,...) OR function_call() OR ATOM"""
         result = ParseResult()  # Initialise
@@ -1473,7 +1525,7 @@ class Parser:
             self.advance()
         return result.success(CallNode(atom, arg_nodes))
 
-    def atom(self, in_a_function, in_a_loop):
+    def atom(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """
         Parse a number or a string or a Variable or
         (EXPR) or [...] or IF or FOR or WHILE or FUN
@@ -1579,7 +1631,7 @@ class Parser:
             )
         )
 
-    def list_expr(self, in_a_function, in_a_loop):
+    def list_expr(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """
         Parse a List of Expressions [EXPR, ...] which an be empty i.e. []
         Need to also handle nested lists
@@ -1608,8 +1660,9 @@ class Parser:
             self.advance()
             # Parsed an empty list i.e. []
             return result.success(
-                                    ListNode(element_nodes, pos_start,
-                                             self.current_token.pos_end.copy())
+                ListNode(
+                    element_nodes, pos_start, self.current_token.pos_end.copy()
+                )
             )
 
         # Parse a nonempty list [elem1, ...]
@@ -1631,9 +1684,7 @@ class Parser:
             self.advance()
 
             # Parse an Expression
-            expression = result.register(
-                self.expr(in_a_function, in_a_loop)
-            )
+            expression = result.register(self.expr(in_a_function, in_a_loop))
             element_nodes.append(expression)
             if result.error:
                 return result
@@ -1654,11 +1705,12 @@ class Parser:
 
         # Successful Parse
         return result.success(
-            ListNode(element_nodes, pos_start,
-                     self.current_token.pos_end.copy())
+            ListNode(
+                element_nodes, pos_start, self.current_token.pos_end.copy()
+            )
         )
 
-    def if_expr(self, in_a_function, in_a_loop):
+    def if_expr(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """
         Parse IF Expression/Statement
 
@@ -1730,7 +1782,7 @@ class Parser:
         cases, else_case = all_cases
         return result.success(IfNode(cases, else_case))
 
-    def if_expr_b(self, in_a_function, in_a_loop):
+    def if_expr_b(self, in_a_function: bool, in_a_loop: bool) -> Any:
         """
         Parse all the ELIF expressions/statements
 
@@ -1741,7 +1793,7 @@ class Parser:
         """
         return self.if_expr_cases("ELIF", in_a_function, in_a_loop)
 
-    def if_expr_c(self, in_a_function, in_a_loop):
+    def if_expr_c(self, in_a_function: bool, in_a_loop: bool) -> Any:
         """
         Parse the ELSE expression/statement
 
@@ -1759,9 +1811,9 @@ class Parser:
 
             if self.current_token.type == TOKEN_TYPE_NEWLINE:
                 # ELSE followed by a NL indicates a Multiline ELSE
-                else_case, error = self.parse_multiline_else(in_a_function,
-                                                             in_a_loop,
-                                                             result)
+                else_case, error = self.parse_multiline_else(
+                    in_a_function, in_a_loop, result
+                )
                 if error:
                     return error
                 else:
@@ -1769,9 +1821,7 @@ class Parser:
                     return result.success(else_case)
 
             # This is an ELSE expression - Parse it
-            expr = result.register(
-                self.statement(in_a_function, in_a_loop)
-            )
+            expr = result.register(self.statement(in_a_function, in_a_loop))
             if result.error:
                 return result
 
@@ -1786,7 +1836,9 @@ class Parser:
         # if there is no ELSE statement/expression
         return result.success(else_case)
 
-    def if_expr_b_or_c(self, in_a_function, in_a_loop):
+    def if_expr_b_or_c(
+        self, in_a_function: bool, in_a_loop: bool
+    ) -> ParseResult:
         """Parse ELIF/ELSE Expressions/Statements"""
         result = ParseResult()  # Initialise
         cases, else_case = [], None
@@ -1809,7 +1861,9 @@ class Parser:
 
         return result.success((cases, else_case))
 
-    def if_expr_cases(self, case_keyword, in_a_function, in_a_loop):
+    def if_expr_cases(
+        self, case_keyword: str, in_a_function: bool, in_a_loop: bool
+    ) -> ParseResult:
         """Parse IF/ELIF Expressions/Statements"""
         result = ParseResult()  # Initialise
         cases = []
@@ -1849,11 +1903,8 @@ class Parser:
         # Multiline statements begin with a newline \n or ;
         if self.current_token.type == TOKEN_TYPE_NEWLINE:
             # THEN followed by a NL indicates Multiline IF/ELIF
-            cases, else_case, error = (
-                       self.parse_multiline_then(in_a_function,
-                                                 in_a_loop,
-                                                 condition,
-                                                 result)
+            cases, else_case, error = self.parse_multiline_then(
+                in_a_function, in_a_loop, condition, result
             )
             if error:
                 return error
@@ -1884,16 +1935,16 @@ class Parser:
         # Successful Parse
         return result.success((cases, else_case))
 
-    def parse_multiline_else(self, in_a_function, in_a_loop, result):
+    def parse_multiline_else(
+        self, in_a_function: bool, in_a_loop: bool, result: ParseResult
+    ) -> Any:
         """Parse ELSE Multiline statements"""
 
         result.register_advancement()  # Advance past the NL
         self.advance()
 
         # Parse the statements
-        statements = result.register(
-            self.statements(in_a_function, in_a_loop)
-        )
+        statements = result.register(self.statements(in_a_function, in_a_loop))
         if result.error:
             return result
 
@@ -1907,21 +1958,27 @@ class Parser:
             result.register_advancement()  # Advance past END
             self.advance()
         else:
-            return (None,
-                    result.failure(
-                                    InvalidSyntaxError(
-                                        self.current_token.pos_start,
-                                        self.current_token.pos_end,
-                                        c.ERRORS["end_expected"],
-                                    )
-                                )
+            return (
+                None,
+                result.failure(
+                    InvalidSyntaxError(
+                        self.current_token.pos_start,
+                        self.current_token.pos_end,
+                        c.ERRORS["end_expected"],
                     )
+                ),
+            )
 
         # Successful Parse
         return else_case, None
 
-    def parse_multiline_then(self, in_a_function, in_a_loop,
-                             condition, result):
+    def parse_multiline_then(
+        self,
+        in_a_function: bool,
+        in_a_loop: bool,
+        condition: ParseResult,
+        result: ParseResult,
+    ) -> tuple[None, None, Any] | tuple[list, Any | None, None]:
         """Parse THEN Multiline statements"""
 
         cases = []
@@ -1930,9 +1987,7 @@ class Parser:
         self.advance()
 
         # Parse the statements
-        statements = result.register(
-            self.statements(in_a_function, in_a_loop)
-        )
+        statements = result.register(self.statements(in_a_function, in_a_loop))
         if result.error:
             return None, None, result
 
@@ -1959,7 +2014,7 @@ class Parser:
         # Successful Parse
         return cases, else_case, None
 
-    def for_expr(self, in_a_function, in_a_loop):
+    def for_expr(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """
         Parse FOR Expression/Statement
 
@@ -2082,8 +2137,9 @@ class Parser:
             Because a FOR expression does return a value
             """
             return result.success(
-                ForNode(var_name, start_value, end_value, step_value,
-                        body, False)
+                ForNode(
+                    var_name, start_value, end_value, step_value, body, False
+                )
             )
 
         # Otherwise
@@ -2114,12 +2170,10 @@ class Parser:
         Because FOR statement(s) do not return a value
         """
         return result.success(
-            ForNode(
-                var_name, start_value, end_value, step_value, body, True
-            )
+            ForNode(var_name, start_value, end_value, step_value, body, True)
         )
 
-    def while_expr(self, in_a_function, in_a_loop):
+    def while_expr(self, in_a_function: bool, in_a_loop: bool) -> ParseResult:
         """
         Parse WHILE Expression/Statement
 
@@ -2205,7 +2259,7 @@ class Parser:
         """
         return result.success(WhileNode(condition, body, True))
 
-    def func_def(self, in_a_function, in_a_loop):
+    def func_def(self, in_a_function: bool, in_a_loop: bool) -> Any:
         """
         Parse FUN Expression/Statement
 
@@ -2274,11 +2328,11 @@ class Parser:
             pass
         elif self.current_token.type != TOKEN_TYPE_RPAREN:
             return result.failure(
-                        InvalidSyntaxError(
-                            self.current_token.pos_start,
-                            self.current_token.pos_end,
-                            c.ERRORS["identifier_rparen_expected"],
-                        )
+                InvalidSyntaxError(
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
+                    c.ERRORS["identifier_rparen_expected"],
+                )
             )
 
         """
@@ -2287,12 +2341,11 @@ class Parser:
         then complete the parsing of
         the entire arrow function definition
         """
-        tuple = self.parse_params_and_arrow(result,
-                                            var_name_token,
-                                            param_name_tokens)
+        tuple = self.parse_params_and_arrow(
+            result, var_name_token, param_name_tokens
+        )
 
-        (parsed_arrow, result,
-         param_name_tokens, error) = tuple
+        (parsed_arrow, result, param_name_tokens, error) = tuple
 
         if error:
             # An error occurred
@@ -2324,8 +2377,7 @@ class Parser:
         """
         in_a_function = True
         in_a_loop = False
-        body = result.register(self.statements(in_a_function,
-                                               in_a_loop))
+        body = result.register(self.statements(in_a_function, in_a_loop))
         if result.error:
             return result
 
@@ -2358,12 +2410,17 @@ class Parser:
         """
 
         return result.success(
-            FuncDefNode(var_name_token, param_name_tokens, body,
-                        False)  # should_auto_return
+            FuncDefNode(
+                var_name_token, param_name_tokens, body, False
+            )  # should_auto_return
         )
 
-    def parse_params_and_arrow(self, result,
-                               var_name_token, param_name_tokens):
+    def parse_params_and_arrow(
+        self,
+        result: ParseResult,
+        var_name_token: Token,
+        param_name_tokens: list[Token],
+    ) -> tuple:
         """
         Parse the function's parameters if any
         Upon completion, if it turns out to be an arrow function,
@@ -2375,9 +2432,9 @@ class Parser:
         """
 
         if self.current_token.type == TOKEN_TYPE_RPAREN:
-            return self.checkfor_parse_arrow(result,
-                                             var_name_token,
-                                             param_name_tokens)
+            return self.checkfor_parse_arrow(
+                result, var_name_token, param_name_tokens
+            )
 
         # This list will have the actual parameter names so that
         # a check can be verified that there are no duplicates
@@ -2394,9 +2451,9 @@ class Parser:
         Check whether the function name
         has been used as a parameter name as well
         """
-        if (error := self.duplicate_function_name(function_name,
-                                                  names_list,
-                                                  result)):
+        if error := self.duplicate_function_name(
+            function_name, names_list, result
+        ):
             return error
 
         result.register_advancement()  # Advance past the Identifier
@@ -2409,11 +2466,11 @@ class Parser:
 
             if self.current_token.type != TOKEN_TYPE_IDENTIFIER:
                 error = result.failure(
-                            InvalidSyntaxError(
-                                self.current_token.pos_start,
-                                self.current_token.pos_end,
-                                c.ERRORS["identifier_expected"],
-                            )
+                    InvalidSyntaxError(
+                        self.current_token.pos_start,
+                        self.current_token.pos_end,
+                        c.ERRORS["identifier_expected"],
+                    )
                 )
                 return None, None, [], error
 
@@ -2423,8 +2480,11 @@ class Parser:
                     InvalidSyntaxError(
                         self.current_token.pos_start,
                         self.current_token.pos_end,
-                        (f"Duplicate parameter '{self.current_token.value}' "
-                         "in function definition"),
+                        (
+                            "Duplicate parameter "
+                            f"'{self.current_token.value}' "
+                            "in function definition"
+                        ),
                     )
                 )
                 return None, None, [], error
@@ -2432,8 +2492,9 @@ class Parser:
             param_name_tokens.append(self.current_token)
             names_list.append(self.current_token.value)
             # Check if the function name has already been used
-            if (error := self.duplicate_function_name(function_name,
-                                                      names_list, result)):
+            if error := self.duplicate_function_name(
+                function_name, names_list, result
+            ):
                 return error
 
             result.register_advancement()  # Advance past the Identifier
@@ -2441,20 +2502,24 @@ class Parser:
 
         if self.current_token.type != TOKEN_TYPE_RPAREN:
             error = result.failure(
-                        InvalidSyntaxError(
-                            self.current_token.pos_start,
-                            self.current_token.pos_end,
-                            c.ERRORS["comma_rparen_expected"],
-                        )
+                InvalidSyntaxError(
+                    self.current_token.pos_start,
+                    self.current_token.pos_end,
+                    c.ERRORS["comma_rparen_expected"],
+                )
             )
             return None, None, [], error
 
-        return self.checkfor_parse_arrow(result,
-                                         var_name_token,
-                                         param_name_tokens)
+        return self.checkfor_parse_arrow(
+            result, var_name_token, param_name_tokens
+        )
 
-    def checkfor_parse_arrow(self, result,
-                             var_name_token, param_name_tokens):
+    def checkfor_parse_arrow(
+        self,
+        result: ParseResult,
+        var_name_token: Token,
+        param_name_tokens: list[Token],
+    ) -> tuple:
         """
         Check to see if this is an arrow function
         If so, complete the parsing of
@@ -2494,16 +2559,17 @@ class Parser:
         """
 
         parsed_arrow = result.success(
-                                FuncDefNode(var_name_token,
-                                            param_name_tokens,
-                                            body,
-                                            True)  # should_auto_return
+            FuncDefNode(
+                var_name_token, param_name_tokens, body, True
+            )  # should_auto_return
         )
 
         # This IS an arrow function!
         return parsed_arrow, result, param_name_tokens, None
 
-    def duplicate_function_name(self, function_name, names_list, result):
+    def duplicate_function_name(
+        self, function_name: str, names_list: list, result: ParseResult
+    ) -> Any:
         """
         Check whether the function name
         has been used as a parameter name as well
@@ -2515,16 +2581,25 @@ class Parser:
                 InvalidSyntaxError(
                     self.current_token.pos_start,
                     self.current_token.pos_end,
-                    (f"Duplicate parameter '{function_name}'. "
-                     "A parameter cannot share the same name "
-                     "as the function name"),
+                    (
+                        f"Duplicate parameter '{function_name}'. "
+                        "A parameter cannot share the same name "
+                        "as the function name"
+                    ),
                 )
             )
             return None, None, [], error
 
     ###################################
 
-    def bin_op(self, in_a_function, in_a_loop, func_a, ops, func_b=None):
+    def bin_op(
+        self,
+        in_a_function: bool,
+        in_a_loop: bool,
+        func_a: Any,
+        ops: list,
+        func_b: Any = None,
+    ) -> ParseResult:
         if func_b is None:
             func_b = func_a
 
@@ -2554,7 +2629,7 @@ class Parser:
 
 
 class RTResult:
-    def __init__(self):
+    def __init__(self) -> None:
         self.reset()
 
     def reset(self):
@@ -2564,39 +2639,39 @@ class RTResult:
         self.loop_should_continue = False
         self.loop_should_break = False
 
-    def register(self, result):
+    def register(self, result: ParseResult) -> Any:
         self.error = result.error
         self.func_return_value = result.func_return_value
         self.loop_should_continue = result.loop_should_continue
         self.loop_should_break = result.loop_should_break
         return result.value
 
-    def success(self, value):
+    def success(self, value: Any) -> Self:
         self.reset()
         self.value = value
         return self
 
-    def success_return(self, value):
+    def success_return(self, value: Any) -> Self:
         self.reset()
         self.func_return_value = value
         return self
 
-    def success_continue(self):
+    def success_continue(self) -> Self:
         self.reset()
         self.loop_should_continue = True
         return self
 
-    def success_break(self):
+    def success_break(self) -> Self:
         self.reset()
         self.loop_should_break = True
         return self
 
-    def failure(self, error):
+    def failure(self, error) -> Self:
         self.reset()
         self.error = error
         return self
 
-    def should_return(self):
+    def should_return(self) -> Any:
         # Note: this will enable to 'continue' a loop and
         # 'break' a loop as well as
         # 'break' outside the current function
@@ -2614,74 +2689,76 @@ class RTResult:
 
 
 class Value:
-    def __init__(self):
+    def __init__(self) -> None:
         self.set_pos()
         self.set_context()
 
-    def set_pos(self, pos_start=None, pos_end=None):
+    def set_pos(
+        self, pos_start: Optional[int] = None, pos_end: Optional[int] = None
+    ) -> Self:
         self.pos_start = pos_start
         self.pos_end = pos_end
         return self
 
-    def set_context(self, context=None):
+    def set_context(self, context: Optional[Any] = None) -> Self:
         self.context = context
         return self
 
-    def added_to(self, other):
+    def added_to(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def subtracted_by(self, other):
+    def subtracted_by(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def multiplied_by(self, other):
+    def multiplied_by(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def divided_by(self, other):
+    def divided_by(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def modulused_by(self, other):
+    def modulused_by(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def powered_by(self, other):
+    def powered_by(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def get_comparison_eq(self, other):
+    def get_comparison_eq(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def get_comparison_ne(self, other):
+    def get_comparison_ne(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def get_comparison_lt(self, other):
+    def get_comparison_lt(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def get_comparison_gt(self, other):
+    def get_comparison_gt(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def get_comparison_lte(self, other):
+    def get_comparison_lte(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def get_comparison_gte(self, other):
+    def get_comparison_gte(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def anded_by(self, other):
+    def anded_by(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def ored_by(self, other):
+    def ored_by(self, other: Any) -> tuple:
         return None, self.illegal_operation(other)
 
-    def notted(self, other=None):
+    def notted(self, other: Optional[Any] = None) -> tuple:
         return None, self.illegal_operation(other)
 
-    def execute(self, args):
+    def execute(self, args: list) -> RTResult:
         return RTResult().failure(self.illegal_operation())
 
-    def copy(self):
+    def copy(self) -> Exception:
         raise Exception("No copy method defined")
 
-    def is_true(self):
+    def is_true(self) -> bool:
         return False
 
-    def illegal_operation(self, other=None):
+    def illegal_operation(self, other: Optional[Any] = None) -> RTError:
         if not other:
             other = self
         return RTError(
@@ -2690,11 +2767,11 @@ class Value:
 
 
 class Number(Value):
-    def __init__(self, value):
+    def __init__(self, value: Any) -> None:
         super().__init__()
         self.value = value
 
-    def added_to(self, other):
+    def added_to(self, other: Any) -> tuple:
         """Addition: number1 + number2"""
         if isinstance(other, Number):
             return (
@@ -2704,7 +2781,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def subtracted_by(self, other):
+    def subtracted_by(self, other: Any) -> tuple:
         """Subtraction: number1 - number2"""
         if isinstance(other, Number):
             return (
@@ -2714,7 +2791,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def multiplied_by(self, other):
+    def multiplied_by(self, other: Any) -> tuple:
         """Multiplication: number1 * number2"""
         if isinstance(other, Number):
             return (
@@ -2724,7 +2801,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def divided_by(self, other):
+    def divided_by(self, other: Any) -> tuple:
         """Division: number1 / number2"""
         if isinstance(other, Number):
             if other.value == 0:
@@ -2742,7 +2819,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def modulused_by(self, other):
+    def modulused_by(self, other: Any) -> tuple:
         """Modulus/Remainder: number1 % number2"""
         if isinstance(other, Number):
             if other.value == 0:
@@ -2760,7 +2837,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def powered_by(self, other):
+    def powered_by(self, other: Any) -> tuple:
         """Power Operator/Exponentiation: number1 ^ number2"""
         if isinstance(other, Number):
             return (
@@ -2770,7 +2847,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def get_comparison_eq(self, other):
+    def get_comparison_eq(self, other: Any) -> tuple:
         """== Equal To"""
         if isinstance(other, Number):
             return (
@@ -2782,7 +2859,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def get_comparison_ne(self, other):
+    def get_comparison_ne(self, other: Any) -> tuple:
         """!= Not Equal To"""
         if isinstance(other, Number):
             return (
@@ -2794,7 +2871,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def get_comparison_lt(self, other):
+    def get_comparison_lt(self, other: Any) -> tuple:
         """< Less Than"""
         if isinstance(other, Number):
             return (
@@ -2806,7 +2883,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def get_comparison_gt(self, other):
+    def get_comparison_gt(self, other: Any) -> tuple:
         """> Greater Than"""
         if isinstance(other, Number):
             return (
@@ -2818,7 +2895,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def get_comparison_lte(self, other):
+    def get_comparison_lte(self, other: Any) -> tuple:
         """<= Less Than Or Equal To"""
         if isinstance(other, Number):
             return (
@@ -2830,7 +2907,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def get_comparison_gte(self, other):
+    def get_comparison_gte(self, other: Any) -> tuple:
         """>= Greater Than Or Equal To"""
         if isinstance(other, Number):
             return (
@@ -2842,7 +2919,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def anded_by(self, other):
+    def anded_by(self, other: Any) -> tuple:
         """and Operator"""
         if isinstance(other, Number):
             return (
@@ -2854,7 +2931,7 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def ored_by(self, other):
+    def ored_by(self, other: Any) -> tuple:
         """or Operator"""
         if isinstance(other, Number):
             return (
@@ -2866,26 +2943,26 @@ class Number(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def notted(self):
+    def notted(self) -> tuple:
         """not Operator"""
         return (
             Number(1 if self.value == 0 else 0).set_context(self.context),
             None,
         )
 
-    def copy(self):
+    def copy(self) -> Self:
         copy = Number(self.value)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
         return copy
 
-    def is_true(self):
+    def is_true(self) -> bool:
         return self.value != 0
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.value)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.value)
 
 
@@ -2896,11 +2973,11 @@ Number.math_PI = Number(math.pi)
 
 
 class String(Value):
-    def __init__(self, value):
+    def __init__(self, value) -> None:
         super().__init__()
         self.value = value
 
-    def added_to(self, other):
+    def added_to(self, other: Any) -> tuple:
         """String Concatenation: string1 + string2"""
         if isinstance(other, String):
             return (
@@ -2910,7 +2987,7 @@ class String(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def multplied_by(self, other):
+    def multplied_by(self, other: Any) -> tuple:
         """Repeat a String: string * number"""
         if isinstance(other, Number):
             return (
@@ -2920,34 +2997,34 @@ class String(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def is_true(self):
+    def is_true(self) -> bool:
         return len(self.value) > 0
 
-    def copy(self):
+    def copy(self) -> Self:
         copy = String(self.value)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
         return copy
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'"{self.value}"'
 
 
 class List(Value):
-    def __init__(self, elements):
+    def __init__(self, elements: Any) -> None:
         super().__init__()
         self.elements = elements
 
-    def added_to(self, other):
+    def added_to(self, other: Any) -> tuple:
         """Append element: list + element"""
         new_list = self.copy()
         new_list.elements.append(other)
         return new_list, None
 
-    def subtracted_by(self, other):
+    def subtracted_by(self, other: Any) -> tuple:
         """Remove element using 'pop': list - number"""
         if isinstance(other, Number):
             new_list = self.copy()
@@ -2964,7 +3041,7 @@ class List(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def multiplied_by(self, other):
+    def multiplied_by(self, other: Any) -> tuple:
         """Extend - Concatenation of Lists: list1 * list2"""
         if isinstance(other, List):
             new_list = self.copy()
@@ -2973,7 +3050,7 @@ class List(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def divided_by(self, other):
+    def divided_by(self, other: Any) -> tuple:
         """Fetch element: list / number"""
         if isinstance(other, Number):
             try:
@@ -2988,37 +3065,39 @@ class List(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def copy(self):
+    def copy(self) -> Self:
         copy = List(self.elements)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
         return copy
 
-    def __str__(self):
+    def __str__(self) -> str:
         return ", ".join([str(x) for x in self.elements])
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'[{", ".join([repr(x) for x in self.elements])}]'
 
 
 class BaseFunction(Value):
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         super().__init__()
         self.name = name or "<anonymous>"
 
-    def set_context(self, context=None):
+    def set_context(self, context: Any = None) -> Any:
         """This code allows for 'true function closures'"""
         if hasattr(self, "context") and self.context:
             return self
         return super().set_context(context)
 
-    def generate_new_context(self):
+    def generate_new_context(self) -> Any:
         """This code enables true function closures"""
         new_context = Context(self.name, self.context, self.pos_start)
         new_context.symbol_table = SymbolTable(new_context.parent.symbol_table)
         return new_context
 
-    def check_params(self, param_names, args):
+    def check_params(
+        self, param_names: list, args: list
+    ) -> RTResult | RTError:
         """
         Ensure that the number of parameters matches
         the function call's number of arguments
@@ -3055,7 +3134,9 @@ class BaseFunction(Value):
 
         return result.success(None)
 
-    def populate_params(self, param_names, args, execution_context):
+    def populate_params(
+        self, param_names: list, args: list, execution_context: Any
+    ) -> None:
         """Populate each parameter with its corresponding value"""
         for i in range(len(args)):
             param_name = param_names[i]
@@ -3063,7 +3144,9 @@ class BaseFunction(Value):
             param_value.set_context(execution_context)
             execution_context.symbol_table.set(param_name, param_value)
 
-    def check_and_populate_params(self, param_names, args, execution_context):
+    def check_and_populate_params(
+        self, param_names: list, args: list, execution_context: Any
+    ) -> RTResult:
         """
         If the number of parameters and arguments match,
         then populate each parameter
@@ -3082,13 +3165,19 @@ class BaseFunction(Value):
 
 
 class Function(BaseFunction):
-    def __init__(self, name, body_node, arg_names, should_auto_return):
+    def __init__(
+        self,
+        name: str,
+        body_node: Any,
+        arg_names: list,
+        should_auto_return: bool,
+    ) -> None:
         super().__init__(name)
         self.body_node = body_node
         self.arg_names = arg_names
         self.should_auto_return = should_auto_return
 
-    def execute(self, args):
+    def execute(self, args: list) -> RTResult:
         result = RTResult()  # initialise
         interpreter = Interpreter()  # initialise the Interpreter
         execution_context = self.generate_new_context()
@@ -3137,7 +3226,7 @@ class Function(BaseFunction):
         )
         return result.success(ret_value)
 
-    def copy(self):
+    def copy(self) -> Self:
         copy = Function(
             self.name, self.body_node, self.arg_names, self.should_auto_return
         )
@@ -3145,15 +3234,15 @@ class Function(BaseFunction):
         copy.set_pos(self.pos_start, self.pos_end)
         return copy
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<function {self.name}>"
 
 
 class BuiltInFunction(BaseFunction):
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         super().__init__(name)
 
-    def execute(self, args):
+    def execute(self, args: list) -> RTResult:
         result = RTResult()
         execution_context = self.generate_new_context()
 
@@ -3176,40 +3265,40 @@ class BuiltInFunction(BaseFunction):
 
         return result.success(return_value)
 
-    def no_visit_method(self, node, context):
+    def no_visit_method(self, node: Any, execution_context: Any) -> Exception:
         raise Exception(f"No execute_{self.name} method defined")
 
-    def copy(self):
+    def copy(self) -> Self:
         copy = BuiltInFunction(self.name)
         copy.set_context(self.context)
         copy.set_pos(self.pos_start, self.pos_end)
         return copy
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<built-in function {self.name}>"
 
     #####################################
 
-    def execute_print(self, execution_context):
+    def execute_print(self, execution_context: Any) -> RTResult:
         print(str(execution_context.symbol_table.get("value")))
         return RTResult().success(Number.none)
 
     execute_print.arg_names = ["value"]
 
-    def execute_print_ret(self, execution_context):
+    def execute_print_ret(self, execution_context: Any) -> RTResult:
         return RTResult().success(
             String(str(execution_context.symbol_table.get("value")))
         )
 
     execute_print_ret.arg_names = ["value"]
 
-    def execute_input(self, execution_context):
+    def execute_input(self, execution_context: Any) -> RTResult:
         text = input()
         return RTResult().success(String(text))
 
     execute_input.arg_names = []
 
-    def execute_input_int(self, execution_context):
+    def execute_input_int(self, execution_context: Any) -> RTResult:
         while True:
             text = input()
             try:
@@ -3221,13 +3310,13 @@ class BuiltInFunction(BaseFunction):
 
     execute_input_int.arg_names = []
 
-    def execute_clear(self, execution_context):
+    def execute_clear(self, execution_context: Any) -> RTResult:
         os.system("cls" if os.name == "nt" else "cls")
         return RTResult().success(Number.none)
 
     execute_clear.arg_names = []
 
-    def execute_is_number(self, execution_context):
+    def execute_is_number(self, execution_context: Any) -> RTResult:
         is_number = isinstance(
             execution_context.symbol_table.get("value"), Number
         )
@@ -3235,7 +3324,7 @@ class BuiltInFunction(BaseFunction):
 
     execute_is_number.arg_names = ["value"]
 
-    def execute_is_string(self, execution_context):
+    def execute_is_string(self, execution_context: Any) -> RTResult:
         is_number = isinstance(
             execution_context.symbol_table.get("value"), String
         )
@@ -3243,7 +3332,7 @@ class BuiltInFunction(BaseFunction):
 
     execute_is_string.arg_names = ["value"]
 
-    def execute_is_list(self, execution_context):
+    def execute_is_list(self, execution_context: Any) -> RTResult:
         is_number = isinstance(
             execution_context.symbol_table.get("value"), List
         )
@@ -3251,7 +3340,7 @@ class BuiltInFunction(BaseFunction):
 
     execute_is_list.arg_names = ["value"]
 
-    def execute_is_function(self, execution_context):
+    def execute_is_function(self, execution_context: Any) -> RTResult:
         is_number = isinstance(
             execution_context.symbol_table.get("value"), BaseFunction
         )
@@ -3259,7 +3348,7 @@ class BuiltInFunction(BaseFunction):
 
     execute_is_function.arg_names = ["value"]
 
-    def execute_append(self, execution_context):
+    def execute_append(self, execution_context: Any) -> RTResult:
         """Mutable Append element: append(list, value)"""
         list_ = execution_context.symbol_table.get("list")
         value = execution_context.symbol_table.get("value")
@@ -3279,7 +3368,7 @@ class BuiltInFunction(BaseFunction):
 
     execute_append.arg_names = ["list", "value"]
 
-    def execute_pop(self, execution_context):
+    def execute_pop(self, execution_context: Any) -> RTResult:
         """Mutable Remove/Pop element: pop(list, index)"""
         list_ = execution_context.symbol_table.get("list")
         index = execution_context.symbol_table.get("index")
@@ -3319,7 +3408,7 @@ class BuiltInFunction(BaseFunction):
 
     execute_pop.arg_names = ["list", "index"]
 
-    def execute_extend(self, execution_context):
+    def execute_extend(self, execution_context: Any) -> RTResult:
         """Mutable Extend - Concatenation of Lists: extend(listA, listB)"""
         listA = execution_context.symbol_table.get("listA")
         listB = execution_context.symbol_table.get("listB")
@@ -3349,7 +3438,7 @@ class BuiltInFunction(BaseFunction):
 
     execute_extend.arg_names = ["listA", "listB"]
 
-    def execute_len(self, execution_context):
+    def execute_len(self, execution_context: Any) -> RTResult:
         """Length of list: len(list)"""
         list_ = execution_context.symbol_table.get("list")
 
@@ -3367,7 +3456,7 @@ class BuiltInFunction(BaseFunction):
 
     execute_len.arg_names = ["list"]
 
-    def execute_run(self, execution_context):
+    def execute_run(self, execution_context: Any) -> RTResult:
         """
         Run File Script: run(filename)
         run() is deprecated. Use 'IMPORT' instead
@@ -3440,7 +3529,12 @@ BuiltInFunction.run = BuiltInFunction("run")
 
 
 class Context:
-    def __init__(self, display_name, parent=None, parent_entry_pos=None):
+    def __init__(
+        self,
+        display_name: str,
+        parent: Any = None,
+        parent_entry_pos: Optional[int] = None,
+    ) -> None:
         self.display_name = display_name
         self.parent = parent
         self.parent_entry_pos = parent_entry_pos
@@ -3453,11 +3547,11 @@ class Context:
 
 
 class SymbolTable:
-    def __init__(self, parent=None):
+    def __init__(self, parent: Any = None) -> None:
         self.symbols = {}
         self.parent = parent
 
-    def get(self, name):
+    def get(self, name: str) -> Any:
         """
         Recursively using the 'parent' determine
         the value of the variable
@@ -3468,11 +3562,11 @@ class SymbolTable:
             return self.parent.get(name)
         return value
 
-    def set(self, name, value):
+    def set(self, name: str, value: Any) -> None:
         """Set the named variable to this value"""
         self.symbols[name] = value
 
-    def remove(self, name):
+    def remove(self, name: str) -> None:
         """Removed the named variable from the symbol table"""
         del self.symbols[name]
 
@@ -3483,31 +3577,31 @@ class SymbolTable:
 
 
 class Interpreter:
-    def visit(self, node, context):
+    def visit(self, node: Any, context: Context) -> Any:
         method_name = f"visit_{type(node).__name__}"
         method = getattr(self, method_name, self.no_visit_method)
         return method(node, context)
 
-    def no_visit_method(self, node, context):
+    def no_visit_method(self, node: Any, context: Context) -> Exception:
         raise Exception(f"No visit_{type(node).__name__} method defined")
 
     ###################################
 
-    def visit_NumberNode(self, node, context):
+    def visit_NumberNode(self, node: Any, context: Context) -> RTResult:
         return RTResult().success(
             Number(node.token.value)
             .set_context(context)
             .set_pos(node.pos_start, node.pos_end)
         )
 
-    def visit_StringNode(self, node, context):
+    def visit_StringNode(self, node: Any, context: Context) -> RTResult:
         return RTResult().success(
             String(node.token.value)
             .set_context(context)
             .set_pos(node.pos_start, node.pos_end)
         )
 
-    def visit_ListNode(self, node, context):
+    def visit_ListNode(self, node: Any, context: Context) -> RTResult:
         result = RTResult()
         elements = []
 
@@ -3523,9 +3617,9 @@ class Interpreter:
             .set_pos(node.pos_start, node.pos_end)
         )
 
-    def visit_VarAccessNode(self, node, context):
+    def visit_VarAccessNode(self, node: Any, context: Context) -> RTResult:
         result = RTResult()  # Initialise
-        var_name = node.var_name_tok.value
+        var_name = node.var_name_token.value
         value = context.symbol_table.get(var_name)
 
         if not value:
@@ -3545,9 +3639,9 @@ class Interpreter:
         )
         return result.success(value)
 
-    def visit_VarAssignNode(self, node, context):
+    def visit_VarAssignNode(self, node: Any, context: Context) -> RTResult:
         result = RTResult()  # Initialise
-        var_name = node.var_name_tok.value
+        var_name = node.var_name_token.value
         value = result.register(self.visit(node.value_node, context))
         if result.should_return():
             return result
@@ -3556,7 +3650,7 @@ class Interpreter:
         context.symbol_table.set(var_name, value)
         return result.success(value)
 
-    def visit_BinOpNode(self, node, context):
+    def visit_BinOpNode(self, node: Any, context: Context) -> RTResult:
         result = RTResult()  # Initialise
         left = result.register(self.visit(node.left_node, context))
         if result.should_return():
@@ -3601,7 +3695,7 @@ class Interpreter:
                 calc_result.set_pos(node.pos_start, node.pos_end)
             )
 
-    def visit_UnaryOpNode(self, node, context):
+    def visit_UnaryOpNode(self, node: Any, context: Context) -> RTResult:
         result = RTResult()  # Initialise
         number = result.register(self.visit(node.node, context))
         if result.should_return():
@@ -3621,7 +3715,7 @@ class Interpreter:
         else:
             return result.success(number.set_pos(node.pos_start, node.pos_end))
 
-    def visit_IfNode(self, node, context):
+    def visit_IfNode(self, node: Any, context: Context) -> RTResult:
         """Execute the IF/ELIF/ELSE expression/statement"""
         result = RTResult()  # Initialise
 
@@ -3667,7 +3761,7 @@ class Interpreter:
         # There is NO ELSE therefore return Number.none
         return result.success(Number.none)
 
-    def visit_ForNode(self, node, context):
+    def visit_ForNode(self, node: Any, context: Context) -> RTResult:
         """Execute the FOR expression/statement"""
         result = RTResult()  # Initialise
         elements = []
@@ -3711,7 +3805,7 @@ class Interpreter:
                 break
 
             # Yes! Update the FOR variable
-            context.symbol_table.set(node.var_name_tok.value, Number(i))
+            context.symbol_table.set(node.var_name_token.value, Number(i))
             i += step_value.value
 
             # Evaluate the FOR body
@@ -3744,7 +3838,7 @@ class Interpreter:
             .set_pos(node.pos_start, node.pos_end)
         )
 
-    def visit_WhileNode(self, node, context):
+    def visit_WhileNode(self, node: Any, context: Context) -> RTResult:
         """Execute the WHILE expression/statement"""
         result = RTResult()  # Initialise
         elements = []
@@ -3791,13 +3885,13 @@ class Interpreter:
             .set_pos(node.pos_start, node.pos_end)
         )
 
-    def visit_FuncDefNode(self, node, context):
+    def visit_FuncDefNode(self, node: Any, context: Context) -> RTResult:
         """Execute the FUN expression/statement"""
         result = RTResult()  # Initialise
 
         # Determine 'func_name' depending on whether the function is anonymous
         # The 'None' value indicates an anonymous function
-        func_name = node.var_name_tok.value if node.var_name_tok else None
+        func_name = node.var_name_token.value if node.var_name_token else None
         body_node = node.body_node
         arg_names = [arg_name.value for arg_name in node.arg_name_tokens]
         func_value = (
@@ -3806,7 +3900,7 @@ class Interpreter:
             .set_pos(node.pos_start, node.pos_end)
         )
 
-        if node.var_name_tok:
+        if node.var_name_token:
             # Function definition assigned to 'func_name'
             # if not anonymous
             # This allows functions to be first class objects
@@ -3814,7 +3908,7 @@ class Interpreter:
 
         return result.success(func_value)
 
-    def visit_CallNode(self, node, context):
+    def visit_CallNode(self, node: Any, context: Context) -> RTResult:
         """Execute a Call of a FUNction"""
         result = RTResult()  # Initialise
         args = []
@@ -3848,7 +3942,7 @@ class Interpreter:
         # Return the Function's return value
         return result.success(return_value)
 
-    def visit_ReturnNode(self, node, context):
+    def visit_ReturnNode(self, node: Any, context: Context) -> RTResult:
         """
         Execute the RETURN expression
         If RETURN is followed by an expression
@@ -3876,17 +3970,17 @@ class Interpreter:
         # Return the determined return value
         return result.success_return(value)
 
-    def visit_ContinueNode(self, node, context):
+    def visit_ContinueNode(self, node: Any, context: Context) -> RTResult:
         """Execute the CONTINUE"""
         return RTResult().success_continue()
 
-    def visit_BreakNode(self, node, context):
+    def visit_BreakNode(self, node: Any, context: Context) -> RTResult:
         """Execute the BREAK"""
         return RTResult().success_break()
 
     """ Allows imports of scripts whilst executing the main script """
 
-    def visit_ImportNode(self, node, context):
+    def visit_ImportNode(self, node: Any, context: Context) -> RTResult:
         result = RTResult()
         filepath = result.register(self.visit(node.string_node, context))
 
@@ -3954,7 +4048,13 @@ global_symbol_table.set("LEN", BuiltInFunction.len)
 global_symbol_table.set("RUN", BuiltInFunction.run)
 
 
-def run(filename, text, context=None, entry_pos=None, return_result=False):
+def run(
+    filename: str,
+    text: str,
+    context: Optional[Context] = None,
+    entry_pos: Optional[int] = None,
+    return_result: bool = False,
+) -> tuple:
     """'RUN' Expanded to allow each script to have its own 'context'"""
     # Generate tokens
     lexer = Lexer(filename, text)
