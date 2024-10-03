@@ -6,7 +6,7 @@ import os
 import math
 import misc
 import constants as c
-from typing import Union, Any, Self, Optional
+from typing import Any, Self, Optional
 
 #######################################
 # ERRORS
@@ -2639,7 +2639,7 @@ class RTResult:
         self.loop_should_continue = False
         self.loop_should_break = False
 
-    def register(self, result: ParseResult) -> Any:
+    def register(self, result: ParseResult | Exception) -> Any:
         self.error = result.error
         self.func_return_value = result.func_return_value
         self.loop_should_continue = result.loop_should_continue
@@ -2950,7 +2950,7 @@ class Number(Value):
             None,
         )
 
-    def copy(self) -> Self:
+    def copy(self) -> Any:
         copy = Number(self.value)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
@@ -3000,7 +3000,7 @@ class String(Value):
     def is_true(self) -> bool:
         return len(self.value) > 0
 
-    def copy(self) -> Self:
+    def copy(self) -> Any:
         copy = String(self.value)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
@@ -3065,7 +3065,7 @@ class List(Value):
         else:
             return None, Value.illegal_operation(self, other)
 
-    def copy(self) -> Self:
+    def copy(self) -> Any:
         copy = List(self.elements)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
@@ -3268,7 +3268,7 @@ class BuiltInFunction(BaseFunction):
     def no_visit_method(self, node: Any, execution_context: Any) -> Exception:
         raise Exception(f"No execute_{self.name} method defined")
 
-    def copy(self) -> Self:
+    def copy(self) -> Any:
         copy = BuiltInFunction(self.name)
         copy.set_context(self.context)
         copy.set_pos(self.pos_start, self.pos_end)
@@ -3548,7 +3548,7 @@ class Context:
 
 class SymbolTable:
     def __init__(self, parent: Any = None) -> None:
-        self.symbols = {}
+        self.symbols: dict = {}
         self.parent = parent
 
     def get(self, name: str) -> Any:
